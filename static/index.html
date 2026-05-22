@@ -14,7 +14,6 @@
       --muted: #6b6b80;
       --accent: #6b4fd8;
       --accent-soft: rgba(107, 79, 216, 0.12);
-      --curate: #d48806;
     }
 
     * { box-sizing: border-box; }
@@ -281,11 +280,6 @@
       stroke-width: 1.25px;
     }
 
-    .node.to-curate circle.core {
-      stroke-dasharray: 2 2;
-      stroke-width: 0.75px;
-    }
-
     .node.bpm-corrected circle.core {
       stroke-dasharray: 1.5 2;
     }
@@ -477,7 +471,6 @@
     <main id="main">
       <div class="topbar">
         <div class="pill" id="view-hint">Scroll to zoom in · drag empty space to pan · BPM × energy grid stays fixed</div>
-        <div class="pill">Dashed ring = To Curate</div>
       </div>
       <div class="legend" id="legend"></div>
       <div class="moments-legend" id="moments-legend" hidden></div>
@@ -1212,7 +1205,6 @@
       const node = viewport.append("g").attr("class", "nodes").selectAll("g").data(tracks).join("g")
         .attr("class", d => {
           const parts = ["node"];
-          if (d.source === "to_curate") parts.push("to-curate");
           if (d.id === state.playingId) parts.push("playing");
           if (d.bpm_octave_corrected) parts.push("bpm-corrected");
           return parts.join(" ");
@@ -1224,7 +1216,7 @@
         .attr("vector-effect", "non-scaling-stroke")
         .attr("r", d => 3 + (d.duration_sec ? Math.min(d.duration_sec / 180, 1) : 0))
         .attr("fill", d => camelotColor(d.key))
-        .attr("stroke", d => d.source === "to_curate" ? "#d48806" : "rgba(0,0,0,0.12)");
+        .attr("stroke", "rgba(0,0,0,0.12)");
 
       function refreshHighlight() {
         const active = state.selectedId;
