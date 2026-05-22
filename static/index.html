@@ -193,21 +193,48 @@
       justify-content: space-between;
       padding: 0 8px;
       margin-top: 2px;
+      min-height: 14px;
+      align-items: center;
       font-size: 10px;
-      line-height: 1;
+      line-height: 14px;
       color: var(--muted);
       font-variant-numeric: tabular-nums;
     }
 
-    .filter-group-bpm .bpm-end-value {
+    .filter-group-bpm .bpm-end-slot {
+      position: relative;
+      flex: 0 0 24px;
+      width: 24px;
+      height: 14px;
+    }
+
+    .filter-group-bpm .bpm-end-value,
+    .filter-group-bpm .bpm-end-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
       padding: 0;
-      border: none;
-      background: none;
+      box-sizing: border-box;
       font: inherit;
-      color: inherit;
+      font-size: inherit;
+      line-height: 14px;
       font-variant-numeric: tabular-nums;
-      cursor: pointer;
       border-radius: 3px;
+    }
+
+    .filter-group-bpm .bpm-end-slot-max .bpm-end-value,
+    .filter-group-bpm .bpm-end-slot-max .bpm-end-input {
+      text-align: right;
+    }
+
+    .filter-group-bpm .bpm-end-value {
+      border: 1px solid transparent;
+      background: none;
+      color: inherit;
+      cursor: pointer;
+      text-align: left;
     }
 
     .filter-group-bpm .bpm-end-value:hover,
@@ -218,16 +245,9 @@
     }
 
     .filter-group-bpm .bpm-end-input {
-      width: 2.75em;
-      padding: 0 2px;
       border: 1px solid var(--accent);
-      border-radius: 3px;
       background: #fff;
-      font: inherit;
-      font-size: inherit;
-      line-height: 1.2;
       color: var(--text);
-      font-variant-numeric: tabular-nums;
       text-align: center;
       -moz-appearance: textfield;
     }
@@ -236,6 +256,11 @@
     .filter-group-bpm .bpm-end-input::-webkit-inner-spin-button {
       -webkit-appearance: none;
       margin: 0;
+    }
+
+    .filter-group-bpm .bpm-end-input[hidden],
+    .filter-group-bpm .bpm-end-value[hidden] {
+      display: none;
     }
 
     .filter-group-bpm .bpm-reset {
@@ -1816,8 +1841,14 @@
               <input id="bpm-max" type="range" min="70" max="180" value="180" />
             </div>
             <div class="bpm-range-ends">
-              <button type="button" class="bpm-end-value" id="bpm-min-label" aria-label="Minimum BPM, click to edit">70</button>
-              <button type="button" class="bpm-end-value" id="bpm-max-label" aria-label="Maximum BPM, click to edit">180</button>
+              <span class="bpm-end-slot">
+                <button type="button" class="bpm-end-value" id="bpm-min-label" aria-label="Minimum BPM, click to edit">70</button>
+                <input type="number" class="bpm-end-input" id="bpm-min-input" hidden min="70" max="180" step="1" inputmode="numeric" aria-label="Minimum BPM" />
+              </span>
+              <span class="bpm-end-slot bpm-end-slot-max">
+                <button type="button" class="bpm-end-value" id="bpm-max-label" aria-label="Maximum BPM, click to edit">180</button>
+                <input type="number" class="bpm-end-input" id="bpm-max-input" hidden min="70" max="180" step="1" inputmode="numeric" aria-label="Maximum BPM" />
+              </span>
             </div>
           </div>
         </div>
@@ -3315,9 +3346,6 @@
       }
       if (state.activeKeys.size) parts.push([...state.activeKeys].sort().join(", "));
       if (state.genre !== "all") parts.push(state.genre);
-      if (state.bpmMin > PLOT.bpmDomain[0] || state.bpmMax < PLOT.bpmDomain[1]) {
-        parts.push(`${state.bpmMin}–${state.bpmMax} BPM`);
-      }
       if (state.sources.size === 1) {
         parts.push(state.sources.has("tracks") ? "Library" : "Curate");
       }
@@ -4590,11 +4618,24 @@
       }
     }
 
+    const BPM_END_FIELDS = {
+      min: { labelId: "bpm-min-label", inputId: "bpm-min-input" },
+      max: { labelId: "bpm-max-label", inputId: "bpm-max-input" },
+    };
+
+    function bpmEndElements(which) {
+      const { labelId, inputId } = BPM_END_FIELDS[which];
+      return {
+        label: document.getElementById(labelId),
+        input: document.getElementById(inputId),
+      };
+    }
+
     function updateBpmLabel() {
-      const minEl = document.getElementById("bpm-min-label");
-      const maxEl = document.getElementById("bpm-max-label");
-      if (minEl?.classList.contains("bpm-end-value")) minEl.textContent = String(state.bpmMin);
-      if (maxEl?.classList.contains("bpm-end-value")) maxEl.textContent = String(state.bpmMax);
+      const { label: minLabel } = bpmEndElements("min");
+      const { label: maxLabel } = bpmEndElements("max");
+      if (minLabel) minLabel.textContent = String(state.bpmMin);
+      if (maxLabel) maxLabel.textContent = String(state.bpmMax);
       const lo = PLOT.bpmDomain[0];
       const hi = PLOT.bpmDomain[1];
       const span = hi - lo || 1;
@@ -4610,20 +4651,15 @@
 
     function finishBpmLabelEdit(which, value) {
       bpmLabelEditing = null;
-      const id = which === "min" ? "bpm-min-label" : "bpm-max-label";
-      const el = document.getElementById(id);
-      if (!el) return;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "bpm-end-value";
-      btn.id = id;
-      btn.setAttribute("aria-label", which === "min" ? "Minimum BPM, click to edit" : "Maximum BPM, click to edit");
-      btn.textContent = String(value);
-      el.replaceWith(btn);
+      const { label, input } = bpmEndElements(which);
+      if (!label || !input) return;
+      label.textContent = String(value);
+      input.hidden = true;
+      label.hidden = false;
     }
 
     function commitBpmLabelEdit(which, input) {
-      if (bpmLabelCanceling || !input?.isConnected) return;
+      if (bpmLabelCanceling || input?.hidden) return;
       const lo = PLOT.bpmDomain[0];
       const hi = PLOT.bpmDomain[1];
       let value = Math.round(Number(input.value));
@@ -4654,45 +4690,34 @@
 
     function startBpmLabelEdit(which) {
       if (bpmLabelEditing) return;
-      const id = which === "min" ? "bpm-min-label" : "bpm-max-label";
-      const btn = document.getElementById(id);
-      if (!btn?.classList.contains("bpm-end-value")) return;
+      const { label, input } = bpmEndElements(which);
+      if (!label || label.hidden) return;
       bpmLabelEditing = which;
-      const current = which === "min" ? state.bpmMin : state.bpmMax;
-      const input = document.createElement("input");
-      input.type = "number";
-      input.className = "bpm-end-input";
-      input.id = id;
-      input.min = String(PLOT.bpmDomain[0]);
-      input.max = String(PLOT.bpmDomain[1]);
-      input.step = "1";
-      input.inputMode = "numeric";
-      input.value = String(current);
-      input.setAttribute("aria-label", which === "min" ? "Minimum BPM" : "Maximum BPM");
-      input.addEventListener("keydown", e => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commitBpmLabelEdit(which, input);
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          cancelBpmLabelEdit(which);
-        }
-      });
-      input.addEventListener("blur", () => {
-        setTimeout(() => commitBpmLabelEdit(which, input), 0);
-      });
-      btn.replaceWith(input);
+      input.value = String(which === "min" ? state.bpmMin : state.bpmMax);
+      label.hidden = true;
+      input.hidden = false;
       input.focus();
       input.select();
     }
 
     function bindBpmLabelEditors() {
-      document.querySelector(".bpm-range-ends")?.addEventListener("click", e => {
-        const btn = e.target.closest(".bpm-end-value");
-        if (!btn) return;
-        startBpmLabelEdit(btn.id === "bpm-min-label" ? "min" : "max");
-      });
+      for (const which of ["min", "max"]) {
+        const { label, input } = bpmEndElements(which);
+        label?.addEventListener("click", () => startBpmLabelEdit(which));
+        input?.addEventListener("keydown", e => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitBpmLabelEdit(which, input);
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            cancelBpmLabelEdit(which);
+          }
+        });
+        input?.addEventListener("blur", () => {
+          setTimeout(() => commitBpmLabelEdit(which, input), 0);
+        });
+      }
     }
 
     function updateBpmResetButton() {
