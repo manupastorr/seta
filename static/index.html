@@ -203,15 +203,64 @@
     }
 
     .bpm-range-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      column-gap: 8px;
       margin: 14px 0 6px;
+      min-height: 20px;
     }
 
     .bpm-range-header label {
       margin: 0;
+      min-width: 0;
+    }
+
+    .bpm-range-header .bpm-reset {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      font-size: 12px;
+    }
+
+    .filter-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      column-gap: 8px;
+      margin-bottom: 8px;
+      min-height: 20px;
+    }
+
+    .filter-header-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      line-height: 1.2;
+      min-width: 0;
+    }
+
+    .filter-hint {
+      display: block;
+      font-size: 9px;
+      color: var(--muted);
+      margin: -4px 0 6px;
+      line-height: 1.3;
+    }
+
+    .filter-header .bpm-reset {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      font-size: 12px;
     }
 
     .bpm-reset {
@@ -220,15 +269,15 @@
       background: none;
       color: var(--accent);
       font: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      padding: 0;
+      font-size: 13px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 6px;
       cursor: pointer;
     }
 
     .bpm-reset:hover:not(:disabled) {
-      text-decoration: underline;
+      background: rgba(107, 79, 216, 0.08);
     }
 
     .bpm-reset:disabled {
@@ -539,35 +588,24 @@
       position: absolute;
       right: 18px;
       bottom: 18px;
-      width: max-content;
+      width: 196px;
       max-width: 196px;
-      background: rgba(255, 255, 255, 0.95);
+      background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 14px;
-      padding: 10px 12px 12px;
+      padding: 8px 10px 10px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
       z-index: 4;
       pointer-events: auto;
-    }
-
-    .legend-hint {
-      display: block;
-      font-size: 10px;
-      color: var(--muted);
-      margin: -4px 0 8px;
-      line-height: 1.3;
-      text-align: center;
+      overflow: hidden;
     }
 
     .legend-title {
-      display: block;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--muted);
-      text-align: center;
-      margin-bottom: 8px;
     }
 
     .camelot-wheel {
@@ -576,6 +614,7 @@
       height: 168px;
       max-width: 168px;
       max-height: 168px;
+      margin: 0 auto;
       flex-shrink: 0;
       touch-action: auto;
     }
@@ -741,7 +780,7 @@
       position: absolute;
       right: 18px;
       top: 18px;
-      background: rgba(255, 255, 255, 0.95);
+      background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 14px;
       padding: 8px 10px;
@@ -750,40 +789,30 @@
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
       z-index: 4;
       pointer-events: auto;
-    }
-
-    .moments-legend-hint {
-      display: block;
-      font-size: 9px;
-      color: var(--muted);
-      margin: -4px 0 6px;
-      line-height: 1.3;
+      overflow: hidden;
     }
 
     .moments-legend-title {
-      display: block;
       font-size: 10px;
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 8px;
     }
 
     .moments-legend-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 8px;
+      grid-template-columns: 1fr;
+      gap: 3px;
     }
 
     .moment-legend-item {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 10px;
+      gap: 4px;
+      font-size: 8px;
       line-height: 1.2;
       color: var(--text);
-      min-width: 0;
       width: 100%;
       padding: 3px 5px;
       border: 1px solid transparent;
@@ -815,15 +844,14 @@
 
     .moment-cloud {
       flex-shrink: 0;
-      font-size: 13px;
+      font-size: 10px;
       line-height: 1;
       filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
     }
 
     .moment-legend-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
+      overflow: visible;
     }
 
     .moment-label {
@@ -860,7 +888,7 @@
 
       <div class="bpm-range-header">
         <label for="bpm-min">BPM range <span id="bpm-label"></span></label>
-        <button type="button" class="bpm-reset" id="bpm-reset" disabled>Reset</button>
+        <button type="button" class="bpm-reset" id="bpm-reset" title="Reset BPM range" aria-label="Reset BPM range" disabled>↺</button>
       </div>
       <div class="bpm-range">
         <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
@@ -1358,8 +1386,11 @@
       const filterOn = state.activeMoments.size > 0;
       legend.classList.toggle("is-filtering", filterOn);
       legend.innerHTML = `
-        <span class="moments-legend-title">Set moments</span>
-        <span class="moments-legend-hint">${filterOn ? "Showing tracks in selected zones" : "Click a zone to filter tracks"}</span>
+        <div class="filter-header moments-legend-header">
+          <span class="moments-legend-title filter-header-title">Set moments</span>
+          <button type="button" class="bpm-reset moments-reset" title="Reset filters" aria-label="Reset set moment filters"${filterOn ? "" : " disabled"}>↺</button>
+        </div>
+        <span class="moments-legend-hint filter-hint">${filterOn ? "Showing tracks in selected zones" : "Click a zone to filter tracks"}</span>
         <div class="moments-legend-grid"></div>`;
       const grid = legend.querySelector(".moments-legend-grid");
       SET_MOMENTS.forEach(moment => {
@@ -1371,6 +1402,12 @@
         row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label">${moment.label}</span>`;
         grid.appendChild(row);
       });
+    }
+
+    function resetMomentsFilter() {
+      if (!state.activeMoments.size) return;
+      state.activeMoments.clear();
+      renderGraph();
     }
 
     function drawGrid(container, x, y, plotWidth, plotHeight) {
@@ -1809,11 +1846,20 @@
       }
 
       legend.innerHTML = `
-        <span class="legend-title">Camelot</span>
-        <span class="legend-hint">${filterOn ? "Showing selected keys" : "Click a key to filter tracks"}</span>
+        <div class="filter-header legend-header">
+          <span class="legend-title filter-header-title">Camelot</span>
+          <button type="button" class="bpm-reset camelot-reset" title="Reset key filters" aria-label="Reset Camelot key filters"${filterOn ? "" : " disabled"}>↺</button>
+        </div>
+        <span class="legend-hint filter-hint">${filterOn ? "Showing selected keys" : "Click a key to filter tracks"}</span>
         <svg class="camelot-wheel" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Camelot key wheel">
           ${svg}
         </svg>`;
+    }
+
+    function resetCamelotFilter() {
+      if (!state.activeKeys.size) return;
+      state.activeKeys.clear();
+      renderGraph();
     }
 
     function populateGenres(tracks) {
@@ -2260,6 +2306,10 @@
       });
 
       document.getElementById("moments-legend").addEventListener("click", (e) => {
+        if (e.target.closest(".moments-reset")) {
+          resetMomentsFilter();
+          return;
+        }
         const btn = e.target.closest(".moment-legend-item");
         if (!btn) return;
         const id = btn.dataset.momentId;
@@ -2269,6 +2319,10 @@
       });
 
       document.getElementById("legend").addEventListener("click", (e) => {
+        if (e.target.closest(".camelot-reset")) {
+          resetCamelotFilter();
+          return;
+        }
         const seg = e.target.closest(".camelot-key");
         if (!seg) return;
         const key = seg.dataset.key;
