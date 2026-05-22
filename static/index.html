@@ -29,12 +29,19 @@
     #app {
       display: grid;
       grid-template-columns: 320px 1fr;
+      grid-template-rows: 1fr;
       height: 100vh;
+      position: relative;
     }
 
     aside {
-      border-right: 1px solid var(--panel-border);
-      background: var(--bg);
+      position: relative;
+      z-index: 2;
+      grid-column: 1;
+      grid-row: 1;
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(12px);
       padding: 20px 18px;
       overflow: auto;
     }
@@ -252,14 +259,28 @@
 
     #main {
       position: relative;
-      background: var(--bg);
+      z-index: 1;
+      grid-column: 1 / -1;
+      grid-row: 1;
+      background: transparent;
       overflow: visible;
+      pointer-events: none;
+    }
+
+    #main > :not(#graph) {
+      pointer-events: auto;
+      position: relative;
+      z-index: 1;
     }
 
     #graph {
+      position: absolute;
+      inset: 0;
       width: 100%;
-      height: 100vh;
+      height: 100%;
       display: block;
+      z-index: 0;
+      pointer-events: auto;
       cursor: grab;
       touch-action: none;
       overflow: visible;
@@ -390,6 +411,14 @@
     }
 
     .node.dim circle.core {
+      opacity: 0.08;
+    }
+
+    .node.obscured circle.core {
+      opacity: 0.55;
+    }
+
+    .node.dim.obscured circle.core {
       opacity: 0.08;
     }
 
@@ -821,11 +850,31 @@
       return visual + 1;
     }
 
+    function sidebarWidth() {
+      const aside = document.querySelector("aside");
+      return aside ? aside.getBoundingClientRect().width : 320;
+    }
+
+    function isNodeBehindSidebar(node) {
+      if (node.x == null || node.y == null || !state.viewport) return false;
+      const layer = state.viewport.node();
+      const svg = layer?.ownerSVGElement;
+      if (!layer || !svg) return false;
+      const pt = svg.createSVGPoint();
+      pt.x = node.x;
+      pt.y = node.y;
+      const ctm = layer.getScreenCTM();
+      if (!ctm) return false;
+      const screen = pt.matrixTransform(ctm);
+      return screen.x < sidebarWidth() - 1;
+    }
+
     function trackAt(px, py, tracks, strict = shouldShowLoupe()) {
       let hovered = null;
       let bestDist = Infinity;
       for (const track of tracks) {
         if (track.x == null || track.y == null) continue;
+        if (isNodeBehindSidebar(track)) continue;
         const limit = nodeHoverRadius(track, strict);
         const dist = Math.hypot(track.x - px, track.y - py);
         if (dist <= limit && dist < bestDist) {
@@ -864,6 +913,7 @@
 
     function tryPlayTrackAt(event) {
       if (state.pointerDragged || !state.viewport) return;
+      if (event.clientX < sidebarWidth()) return;
       const [px, py] = d3.pointer(event, state.viewport.node());
       const { plotWidth, plotHeight } = plotSize();
       if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
@@ -955,7 +1005,7 @@
     }
 
     function plotSize() {
-      const width = document.getElementById("main").clientWidth;
+      const width = document.getElementById("app").clientWidth;
       const height = window.innerHeight;
       return {
         width,
@@ -1748,6 +1798,7 @@
         node.classed("playing", d => d.id === state.playingId);
         node.classed("neighbor", d => neighbors && neighbors.has(d.id) && d.id !== active);
         node.classed("dim", d => neighbors && !neighbors.has(d.id));
+        node.classed("obscured", d => isNodeBehindSidebar(d));
         if (link) {
           link.style("opacity", state.highlightNeighbors ? 0 : 1);
         }
@@ -1781,6 +1832,7 @@
             .attr("y2", d => d.target.y);
         }
         node.attr("transform", d => `translate(${d.x},${d.y})`);
+        node.classed("obscured", d => isNodeBehindSidebar(d));
         if (state.highlightNeighbors) updateMixLinks();
         if (state.loupePointer && shouldShowLoupe()) {
           renderLoupe(state.loupePointer.x, state.loupePointer.y, tracks);
