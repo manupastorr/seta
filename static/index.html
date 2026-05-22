@@ -250,6 +250,12 @@
     .link {
       stroke: rgba(80, 80, 120, 0.05);
       stroke-width: 0.5;
+      pointer-events: none;
+    }
+
+    .links,
+    .mix-links {
+      pointer-events: none;
     }
 
     .link.highlight,
@@ -563,15 +569,15 @@
         .range([plotHeight, 0]);
     }
 
-    function stableJitter(id, amp = 16) {
+    function stableJitter(id, ampX = 34, ampY = 22) {
       let h = 2166136261;
       for (let i = 0; i < id.length; i++) {
         h ^= id.charCodeAt(i);
         h = Math.imul(h, 16777619);
       }
       const angle = ((h & 0xffff) / 0xffff) * Math.PI * 2;
-      const radius = (((h >>> 16) & 0xffff) / 0xffff) * amp;
-      return [Math.cos(angle) * radius, Math.sin(angle) * radius];
+      const radius = (((h >>> 16) & 0xffff) / 0xffff);
+      return [Math.cos(angle) * radius * ampX, Math.sin(angle) * radius * ampY];
     }
 
     function trackPosition(track, x, y, jitter = true) {
@@ -985,8 +991,38 @@
       const hint = document.getElementById("view-hint");
       if (!hint) return;
       hint.textContent = state.layout === "explore"
-        ? "Explore: scroll to zoom · drag empty space to pan · Shift+drag to pan over nodes"
-        : "Mix map: scroll to zoom in · drag to pan · BPM × energy grid stays fixed";
+        ? "Explore: scroll to zoom · Alt+drag to pan · drag nodes to rearrange"
+        : "Mix map: scroll to zoom · Alt+drag to pan · click a node to play";
+    }
+
+    function zoomFilter(event) {
+      if (event.type === "wheel") return true;
+      if (event.type.startsWith("touch")) return true;
+      if (event.button === 1) return true;
+      if (event.altKey || event.shiftKey) {
+        return event.type === "mousedown" && event.button === 0;
+      }
+      const target = event.target;
+      if (target.closest && target.closest("circle.core")) return false;
+      return event.type === "mousedown" && event.button === 0;
+    }
+
+    function bindZoom(svg, viewport) {
+      if (!state.zoomBehavior) {
+        state.zoomBehavior = d3.zoom().scaleExtent([1, 10]);
+      }
+      state.zoomBehavior
+        .filter(zoomFilter)
+        .on("start", () => svg.classed("is-panning", true))
+        .on("end", () => svg.classed("is-panning", false))
+        .on("zoom", (event) => {
+          const { plotWidth, plotHeight } = plotSize();
+          const next = clampTransform(event.transform, plotWidth, plotHeight, state.layout);
+          state.zoomTransform = next;
+          viewport.attr("transform", next);
+        });
+      svg.call(state.zoomBehavior);
+      svg.call(state.zoomBehavior.transform, state.zoomTransform);
     }
 
     function renderGraph() {
@@ -1012,39 +1048,17 @@
         state.axisLayer = svg.append("g").attr("class", "axis-layer");
         state.viewport = svg.append("g").attr("class", "viewport");
         ensureMomentDefs(svg);
-
-        const zoom = d3.zoom()
-          .scaleExtent([1, 10])
-          .filter((event) => {
-            if (event.type === "wheel") return true;
-            if (event.type.startsWith("touch")) return true;
-            if (event.button === 1) return true;
-            if (state.layout === "explore" && event.shiftKey) {
-              return event.type === "mousedown" && event.button === 0;
-            }
-            const onNodeCircle = event.target.closest && event.target.closest("circle.core");
-            if (onNodeCircle) return false;
-            return event.type === "mousedown" && event.button === 0;
-          })
-          .on("start", () => svg.classed("is-panning", true))
-          .on("end", () => svg.classed("is-panning", false))
-          .on("zoom", (event) => {
-            const next = clampTransform(event.transform, plotWidth, plotHeight, state.layout);
-            state.zoomTransform = next;
-            state.viewport.attr("transform", next);
-          });
-
-        state.zoomBehavior = zoom;
-        state.svg = svg;
         state.zoomTransform = clampTransform(
           d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
           plotWidth,
-          plotHeight
+          plotHeight,
+          state.layout
         );
-        svg.call(zoom).call(zoom.transform, state.zoomTransform);
         drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
       }
 
+      bindZoom(svg, state.viewport);
+      state.svg = svg;
       svg.attr("viewBox", `0 0 ${width} ${height}`);
       ensureMomentDefs(svg);
       state.viewport.attr("transform", state.zoomTransform);
@@ -1059,7 +1073,7 @@
         .attr("width", plotWidth)
         .attr("height", plotHeight)
         .attr("fill", "transparent")
-        .style("pointer-events", "all");
+        .style("pointer-events", "none");
 
       if (state.showMoments) {
         drawSetMoments(viewport, x, y);
@@ -1082,15 +1096,15 @@
       });
 
       const simulation = d3.forceSimulation(tracks)
-        .alphaDecay(0.03)
+        .alphaDecay(0.025)
         .force("link", d3.forceLink(edges).id(d => d.id).distance(d => 90 - d.score * 40).strength(d => state.layout === "explore" ? d.score * 0.35 : 0))
-        .force("charge", d3.forceManyBody().strength(state.layout === "explore" ? -20 : -3))
-        .force("collide", d3.forceCollide().radius(4.5).strength(0.85));
+        .force("charge", d3.forceManyBody().strength(state.layout === "explore" ? -20 : -4))
+        .force("collide", d3.forceCollide().radius(6).strength(0.92));
 
       if (state.layout === "mix") {
         simulation
-          .force("x", d3.forceX(d => trackPosition(d, x, y, true).x).strength(0.28))
-          .force("y", d3.forceY(d => trackPosition(d, x, y, true).y).strength(0.28));
+          .force("x", d3.forceX(d => trackPosition(d, x, y, true).x).strength(0.1))
+          .force("y", d3.forceY(d => trackPosition(d, x, y, true).y).strength(0.2));
       } else {
         simulation
           .force("x", d3.forceX(plotWidth / 2).strength(0.03))
@@ -1122,7 +1136,7 @@
 
       const drag = d3.drag()
         .clickDistance(4)
-        .filter(() => state.layout === "explore")
+        .filter((event) => state.layout === "explore" && !event.altKey && !event.shiftKey)
         .on("start", (event, d) => {
           event.sourceEvent.stopPropagation();
           if (!event.active) simulation.alphaTarget(0.25).restart();
@@ -1194,7 +1208,9 @@
           <div class="row">${formatBpm(d)} · ${d.key || "? key"} · energy ${(d.energy ?? 0.5).toFixed(2)}</div>
           ${d.bpm_octave_corrected && d.bpm_raw != null && Math.abs(d.bpm - d.bpm_raw) >= 4
             ? `<div class="row">Analyzer heard ${d.bpm_raw} BPM; placed using half-time grid.</div>`
-            : ""}
+            : d.bpm_source === "tag"
+              ? `<div class="row">BPM from file tag.</div>`
+              : ""}
           <div class="row">${d.genre}${d.batch ? " / " + d.batch : ""} · ${formatDuration(d.duration_sec)}</div>
         `;
       }).on("mousemove", (event) => {

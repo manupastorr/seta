@@ -12,7 +12,7 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 2
+ANALYSIS_VERSION = 3
 BPM_MIN = 70.0
 BPM_MAX = 180.0
 BPM_MAP_MIN = 70.0
@@ -69,6 +69,33 @@ def _detect_key(y: np.ndarray, sr: int) -> tuple[str | None, str | None]:
 
     camelot = pitch_class_to_camelot(best_pc, best_mode)
     return camelot, best_mode
+
+
+def _read_tagged_bpm(path: Path) -> float | None:
+    """Prefer embedded BPM from download/store tags (TBPM) when present."""
+    try:
+        from mutagen import File as MutagenFile
+
+        audio = MutagenFile(path, easy=False)
+        if audio is None:
+            return None
+        for key in ("TBPM", "BPM"):
+            if key not in audio:
+                continue
+            val = audio[key]
+            if hasattr(val, "text"):
+                raw = val.text[0]
+            else:
+                raw = val[0] if isinstance(val, list) else val
+            bpm = float(str(raw).strip())
+            if BPM_MIN <= bpm <= BPM_MAX:
+                return round(bpm, 2)
+            normalized = _normalize_bpm(bpm)
+            if normalized is not None:
+                return float(normalized)
+    except Exception:
+        return None
+    return None
 
 
 def _normalize_bpm(bpm: float) -> float | None:
@@ -189,7 +216,9 @@ def _detect_energy(y: np.ndarray, sr: int) -> float:
     centroid = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
     rms_n = float(np.clip(np.mean(rms) * 8, 0, 1))
     cent_n = float(np.clip(np.mean(centroid) / 5000, 0, 1))
-    return round(0.55 * rms_n + 0.45 * cent_n, 3)
+    flux = librosa.onset.onset_strength(y=y, sr=sr)
+    flux_n = float(np.clip(np.std(flux) * 4, 0, 1))
+    return round(0.5 * rms_n + 0.35 * cent_n + 0.15 * flux_n, 3)
 
 
 def analyze_track(path: Path) -> dict:
@@ -208,18 +237,29 @@ def analyze_track(path: Path) -> dict:
             "bpm": None,
             "bpm_raw": None,
             "bpm_octave_corrected": False,
+            "bpm_source": None,
             "key": None,
             "energy": 0.5,
             "analysis_error": str(exc),
         }
 
     bpm, bpm_raw, bpm_octave_corrected = _detect_bpm(y, sr)
+    bpm_source = "analysis"
+
+    tagged = _read_tagged_bpm(path)
+    if tagged is not None:
+        bpm = tagged
+        bpm_raw = tagged
+        bpm_octave_corrected = False
+        bpm_source = "tag"
+
     return {
         "analysis_version": ANALYSIS_VERSION,
         "duration_sec": duration_sec,
         "bpm": bpm,
         "bpm_raw": bpm_raw,
         "bpm_octave_corrected": bpm_octave_corrected,
+        "bpm_source": bpm_source,
         "key": _detect_key(y, sr)[0],
         "energy": _detect_energy(y, sr),
         "analysis_error": None,
