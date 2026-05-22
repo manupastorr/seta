@@ -1885,8 +1885,8 @@
     let ellipsisTipAnchor = null;
 
     const PLOT = {
-      margin: { top: 44, right: 36, bottom: 52, left: 64 },
-      inset: { left: 52, right: 36, top: 52, bottom: 40 },
+      margin: { top: 44, right: 36, bottom: 56, left: 64 },
+      inset: { left: 52, right: 36, top: 52, bottom: 58 },
       bpmDomain: [70, 180],
       energyDomain: [0, 1]
     };
@@ -2670,11 +2670,11 @@
       return max - Math.abs(j) * 0.65;
     }
 
-    function boundToPlot(x, y, plotWidth, plotHeight, id, pad = 6) {
-      const minX = pad;
-      const maxX = plotWidth - pad;
-      const minY = pad;
-      const maxY = plotHeight - pad;
+    function boundToPlot(x, y, plotWidth, plotHeight, id) {
+      const minX = 6;
+      const maxX = plotWidth - 6;
+      const minY = PLOT.inset.top;
+      const maxY = plotHeight - PLOT.inset.bottom;
       return {
         x: softBound(x, minX, maxX, `${id}:x`),
         y: softBound(y, minY, maxY, `${id}:y`)
@@ -2856,12 +2856,14 @@
     function drawGrid(container, x, y, plotWidth, plotHeight) {
       const grid = container.append("g").attr("class", "grid");
 
+      const gridBottom = plotHeight - PLOT.inset.bottom;
       for (let bpm = PLOT.bpmDomain[0]; bpm <= PLOT.bpmDomain[1]; bpm += 20) {
         const px = x(bpm);
         grid.append("line")
           .attr("class", "grid-line major")
           .attr("x1", px).attr("x2", px)
-          .attr("y1", 0).attr("y2", plotHeight);
+          .attr("y1", PLOT.inset.top)
+          .attr("y2", gridBottom);
       }
 
       for (const e of energyAxisTicks()) {
