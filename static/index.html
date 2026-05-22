@@ -29,7 +29,7 @@
 
     #app {
       --sidebar-width: 272px;
-      --player-height: 68px;
+      --player-height: 72px;
       display: grid;
       grid-template-columns: var(--sidebar-width) 1fr;
       grid-template-rows: 1fr var(--player-height);
@@ -398,7 +398,7 @@
       display: flex;
       align-items: center;
       min-height: var(--player-height);
-      padding: 6px 12px 8px;
+      padding: 7px 14px 9px;
       border-top: 1px solid var(--panel-border);
       background: rgba(255, 255, 255, 0.97);
       backdrop-filter: blur(14px);
@@ -408,8 +408,8 @@
 
     .player-dock-inner {
       display: grid;
-      grid-template-columns: auto minmax(120px, 220px) minmax(0, 1fr);
-      gap: 6px 10px;
+      grid-template-columns: auto minmax(140px, 280px) minmax(0, 1fr);
+      gap: 8px 16px;
       align-items: center;
       width: 100%;
       min-width: 0;
@@ -450,7 +450,7 @@
 
     .player-main {
       min-width: 0;
-      max-width: 220px;
+      max-width: 280px;
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -1255,9 +1255,9 @@
     const waveformWrap = document.getElementById("waveform-wrap");
     const tooltip = document.getElementById("tooltip");
 
-    const WAVEFORM_BARS = 200;
+    const WAVEFORM_BARS = 400;
     const WAVEFORM_CACHE_MAX = 24;
-    const WAVEFORM_CACHE_VERSION = 3;
+    const WAVEFORM_CACHE_VERSION = 4;
     const SERATO_BAND = {
       low: [211, 47, 47],
       mid: [67, 160, 71],
@@ -1395,6 +1395,16 @@
       }
     }
 
+    function waveformBarLayout(w, barCount, dpr) {
+      const gap = Math.max(1, Math.round(0.5 * dpr));
+      const maxBarW = Math.max(1, Math.round(1 * dpr));
+      const slot = barCount > 0 ? (w - gap * (barCount - 1)) / barCount : w;
+      const barW = Math.min(maxBarW, Math.max(1, slot));
+      const step = slot + gap;
+      const inset = Math.max(0, (slot - barW) / 2);
+      return { barW, step, inset };
+    }
+
     function drawColoredBar(ctx, x, centerY, barW, amp, low, mid, high, alpha) {
       if (amp <= 0) return;
       const { r, g, b } = seratoBandRgb(low, mid, high);
@@ -1404,11 +1414,10 @@
 
     function drawPlaceholderWaveform(ctx, w, h, dpr, loading) {
       const bars = WAVEFORM_BARS;
-      const gap = Math.max(1, dpr);
-      const barW = Math.max(1, (w - gap * (bars - 1)) / bars);
+      const { barW, step, inset } = waveformBarLayout(w, bars, dpr);
       const mid = h / 2;
       for (let i = 0; i < bars; i++) {
-        const x = i * (barW + gap);
+        const x = i * step + inset;
         const amp = (loading ? 0.08 + 0.12 * Math.abs(Math.sin(i * 0.31)) : 0.06) * (h * 0.38);
         const phase = i * 0.17;
         drawColoredBar(
@@ -1447,13 +1456,12 @@
       }
 
       const bars = waveformData.peak.length;
-      const gap = Math.max(1, dpr);
-      const barW = Math.max(1, (w - gap * (bars - 1)) / bars);
+      const { barW, step, inset } = waveformBarLayout(w, bars, dpr);
       const mid = h / 2;
       const playedX = progress * w;
 
       for (let i = 0; i < bars; i++) {
-        const x = i * (barW + gap);
+        const x = i * step + inset;
         const amp = waveformData.peak[i] * (h * 0.46);
         const played = x + barW * 0.5 <= playedX;
         drawColoredBar(
