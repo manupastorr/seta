@@ -633,8 +633,8 @@
 
     .player-dock-inner {
       display: grid;
-      grid-template-columns: auto minmax(140px, 280px) minmax(0, 1fr);
-      gap: 8px 16px;
+      grid-template-columns: auto minmax(0, auto) minmax(0, 1fr);
+      gap: 8px 10px;
       align-items: center;
       width: 100%;
       min-width: 0;
@@ -709,6 +709,47 @@
       overflow: hidden;
       text-overflow: ellipsis;
       min-width: 0;
+    }
+
+    .player-title.is-truncated,
+    .player-artist.is-truncated,
+    .neighbor-title.is-truncated,
+    .neighbor-artist.is-truncated {
+      cursor: default;
+    }
+
+    #ellipsis-tip {
+      position: fixed;
+      z-index: 20;
+      max-width: min(420px, calc(100vw - 16px));
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.35;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(3px);
+      transition: opacity 0.08s ease, transform 0.08s ease;
+    }
+
+    #ellipsis-tip.is-artist {
+      font-weight: 500;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    #ellipsis-tip.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #ellipsis-tip[hidden] {
+      display: none !important;
     }
 
     .player-subline {
@@ -1402,6 +1443,7 @@
       </div>
       <audio id="audio" preload="metadata"></audio>
     </footer>
+    <div id="ellipsis-tip" hidden></div>
   </div>
 
   <script>
@@ -1421,6 +1463,11 @@
     const LOW_BPM_CONFIDENCE = 0.45;
     const MIX_MIN_SCORE = 0.55;
     const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5, clickPickRadius: 10, hoverRadiusBoost: 5 };
+    const ELLIPSIS_TIP_SHOW_MS = 100;
+    const ELLIPSIS_TIP_SELECTOR = ".player-title, .player-artist, .neighbor-title, .neighbor-artist";
+    let ellipsisTipEl = null;
+    let ellipsisTipTimer = null;
+    let ellipsisTipAnchor = null;
 
     const PLOT = {
       margin: { top: 44, right: 36, bottom: 52, left: 64 },
@@ -2606,6 +2653,7 @@
 
       scrollNeighborItemIntoView(state.playingId || anchorId);
       syncNeighborPanelCollapse();
+      syncEllipsisTooltips(list);
     }
 
     function focusOnIds(ids) {
@@ -2748,11 +2796,106 @@
       updatePlayButton();
     }
 
-    function setEllipsisTitle(el, text) {
-      el.textContent = text;
+    function isTextTruncated(el) {
+      return el.scrollWidth > el.clientWidth + 1;
+    }
+
+    function ensureEllipsisTipEl() {
+      if (!ellipsisTipEl) ellipsisTipEl = document.getElementById("ellipsis-tip");
+      return ellipsisTipEl;
+    }
+
+    function hideEllipsisTip() {
+      clearTimeout(ellipsisTipTimer);
+      ellipsisTipTimer = null;
+      ellipsisTipAnchor = null;
+      const tip = ensureEllipsisTipEl();
+      if (!tip) return;
+      tip.classList.remove("is-visible", "is-artist");
+      tip.hidden = true;
+    }
+
+    function positionEllipsisTip(anchor, tip) {
+      const rect = anchor.getBoundingClientRect();
+      tip.hidden = false;
+      tip.style.left = "0px";
+      tip.style.top = "0px";
+      const tipRect = tip.getBoundingClientRect();
+      let top = rect.top - tipRect.height - 6;
+      let left = rect.left;
+      if (top < 8) top = rect.bottom + 6;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
+    }
+
+    function showEllipsisTip(anchor) {
+      const text = anchor.dataset.fullText;
+      if (!text || !anchor.classList.contains("is-truncated")) return;
+      const tip = ensureEllipsisTipEl();
+      if (!tip) return;
+      tip.textContent = text;
+      tip.classList.toggle("is-artist", anchor.classList.contains("player-artist") || anchor.classList.contains("neighbor-artist"));
+      positionEllipsisTip(anchor, tip);
+      tip.classList.add("is-visible");
+    }
+
+    function scheduleEllipsisTip(anchor) {
+      if (ellipsisTipAnchor === anchor) return;
+      hideEllipsisTip();
+      ellipsisTipAnchor = anchor;
+      ellipsisTipTimer = setTimeout(() => {
+        if (ellipsisTipAnchor === anchor) showEllipsisTip(anchor);
+      }, ELLIPSIS_TIP_SHOW_MS);
+    }
+
+    function bindEllipsisTips() {
+      document.addEventListener("mouseover", (event) => {
+        const el = event.target.closest(ELLIPSIS_TIP_SELECTOR);
+        if (!el?.dataset.fullText || !el.classList.contains("is-truncated")) return;
+        scheduleEllipsisTip(el);
+      });
+
+      document.addEventListener("mouseout", (event) => {
+        if (!ellipsisTipAnchor) return;
+        const el = event.target.closest(ELLIPSIS_TIP_SELECTOR);
+        if (el !== ellipsisTipAnchor) return;
+        hideEllipsisTip();
+      });
+
+      window.addEventListener("scroll", hideEllipsisTip, true);
+      window.addEventListener("resize", hideEllipsisTip);
+    }
+
+    function syncEllipsisTitle(el) {
+      if (!el) return;
+      const text = el.dataset.fullText ?? el.textContent ?? "";
       el.removeAttribute("title");
+      if (!text) {
+        el.classList.remove("is-truncated");
+        return;
+      }
       requestAnimationFrame(() => {
-        if (el.scrollWidth > el.clientWidth + 1) el.title = text;
+        requestAnimationFrame(() => {
+          if (!el.isConnected) return;
+          el.classList.toggle("is-truncated", isTextTruncated(el));
+          if (ellipsisTipAnchor === el && !el.classList.contains("is-truncated")) hideEllipsisTip();
+        });
+      });
+    }
+
+    function setEllipsisTitle(el, text) {
+      if (!el) return;
+      const value = text ?? "";
+      el.textContent = value;
+      el.dataset.fullText = value;
+      syncEllipsisTitle(el);
+    }
+
+    function syncEllipsisTooltips(root = document) {
+      root.querySelectorAll(".player-title, .player-artist, .neighbor-title, .neighbor-artist").forEach(el => {
+        if (!el.dataset.fullText && el.textContent) el.dataset.fullText = el.textContent;
+        syncEllipsisTitle(el);
       });
     }
 
@@ -3389,10 +3532,12 @@
       document.getElementById("next-btn").addEventListener("click", () => playRelative(1));
 
       setupWaveform();
+      bindEllipsisTips();
       const playerDock = document.getElementById("player-dock");
       if (playerDock) {
         new ResizeObserver(() => {
           syncUiLayout();
+          syncEllipsisTooltips(playerDock);
           drawWaveform(getWaveformProgress());
           if (state.data) renderGraph();
         }).observe(playerDock);
