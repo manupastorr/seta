@@ -1004,6 +1004,7 @@
       prevLayout: "mix",
       viewport: null,
       axisLayer: null,
+      bpmTickLayer: null,
       svg: null,
       plotWidth: 0,
       plotHeight: 0,
@@ -1419,12 +1420,6 @@
           .attr("class", "grid-line major")
           .attr("x1", px).attr("x2", px)
           .attr("y1", 0).attr("y2", plotHeight);
-        grid.append("text")
-          .attr("class", "tick-label")
-          .attr("x", px)
-          .attr("y", plotHeight + 18)
-          .attr("text-anchor", "middle")
-          .text(bpm);
       }
 
       for (let e = 0; e <= 1.001; e += 0.5) {
@@ -1442,21 +1437,51 @@
       }
     }
 
+    function syncBpmTickLabels(transform = state.zoomTransform) {
+      if (!state.bpmTickLayer) return;
+      const { plotLeft, plotWidth, plotHeight } = plotSize();
+      const x = bpmScale(plotWidth);
+      const yPos = PLOT.margin.top + plotHeight + 18;
+      const minX = plotLeft - 8;
+      const maxX = plotLeft + plotWidth + 8;
+      const ticks = d3.range(
+        PLOT.bpmDomain[0],
+        PLOT.bpmDomain[1] + 1,
+        20
+      );
+
+      const layer = state.bpmTickLayer.selectAll(".bpm-ticks").data([null]).join("g").attr("class", "bpm-ticks");
+      layer.selectAll("text")
+        .data(ticks)
+        .join("text")
+        .attr("class", "tick-label bpm-tick-label")
+        .attr("text-anchor", "middle")
+        .attr("y", yPos)
+        .attr("x", bpm => transform.x + x(bpm) * transform.k)
+        .attr("opacity", bpm => {
+          const screenX = transform.x + x(bpm) * transform.k;
+          return screenX >= minX && screenX <= maxX ? 1 : 0;
+        })
+        .text(d => d);
+    }
+
     function drawAxisLabels(layer, plotLeft, plotWidth, plotHeight) {
-      layer.selectAll("*").remove();
-      layer.append("text")
+      layer.selectAll(".axis-titles").remove();
+      const titles = layer.append("g").attr("class", "axis-titles");
+      titles.append("text")
         .attr("class", "axis-label")
         .attr("x", plotLeft + plotWidth / 2)
         .attr("y", PLOT.margin.top + plotHeight + 40)
         .attr("text-anchor", "middle")
         .text("BPM →");
-      layer.append("text")
+      titles.append("text")
         .attr("class", "axis-label")
         .attr("x", plotLeft - 36)
         .attr("y", PLOT.margin.top + plotHeight / 2)
         .attr("transform", `rotate(-90 ${plotLeft - 36} ${PLOT.margin.top + plotHeight / 2})`)
         .attr("text-anchor", "middle")
         .text("Energy →");
+      syncBpmTickLabels(state.zoomTransform);
     }
 
     function clampTransform(transform, plotLeft, plotWidth, plotHeight, layout = state.layout) {
@@ -1930,6 +1955,7 @@
           const next = clampTransform(event.transform, plotLeft, plotWidth, plotHeight, state.layout);
           state.zoomTransform = next;
           viewport.attr("transform", next);
+          syncBpmTickLabels(next);
           if (!shouldShowLoupe()) hideLoupe();
         });
       svg.call(state.zoomBehavior);
@@ -1961,6 +1987,7 @@
 
         state.axisLayer = svg.append("g").attr("class", "axis-layer");
         state.viewport = svg.append("g").attr("class", "viewport");
+        state.bpmTickLayer = svg.append("g").attr("class", "bpm-tick-layer");
         ensureMomentDefs(svg);
         state.zoomTransform = clampTransform(
           d3.zoomIdentity.translate(plotLeft, PLOT.margin.top),
@@ -2379,6 +2406,7 @@
         state.svg = null;
         state.viewport = null;
         state.axisLayer = null;
+        state.bpmTickLayer = null;
         state.zoomBehavior = null;
         renderGraph();
       });
