@@ -815,16 +815,18 @@
       return 3 + (track.duration_sec ? Math.min(track.duration_sec / 180, 1) : 0);
     }
 
-    function nodeHoverRadius(track) {
-      return nodeVisualRadius(track) + 2;
+    function nodeHoverRadius(track, strict = false) {
+      const visual = nodeVisualRadius(track);
+      if (strict) return Math.max(visual * 0.82, 2.4);
+      return visual + 1;
     }
 
-    function trackAt(px, py, tracks) {
+    function trackAt(px, py, tracks, strict = shouldShowLoupe()) {
       let hovered = null;
       let bestDist = Infinity;
       for (const track of tracks) {
         if (track.x == null || track.y == null) continue;
-        const limit = nodeHoverRadius(track);
+        const limit = nodeHoverRadius(track, strict);
         const dist = Math.hypot(track.x - px, track.y - py);
         if (dist <= limit && dist < bestDist) {
           bestDist = dist;
@@ -849,7 +851,7 @@
     }
 
     function updateGraphHover(event, px, py, tracks) {
-      const hovered = trackAt(px, py, tracks);
+      const hovered = trackAt(px, py, tracks, shouldShowLoupe());
       if (!hovered) {
         hideGraphHover();
         return;
@@ -865,7 +867,7 @@
       const [px, py] = d3.pointer(event, state.viewport.node());
       const { plotWidth, plotHeight } = plotSize();
       if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
-      const track = trackAt(px, py, state.renderedTracks);
+      const track = trackAt(px, py, state.renderedTracks, shouldShowLoupe());
       if (track) setNowPlaying(track);
     }
 
