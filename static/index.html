@@ -505,6 +505,8 @@
 
     // Fixed BPM × energy regions — visual guide only, not per-track labels.
     const SET_MOMENTS = [
+      { id: "close-eyes", label: "Close eyes", bpm: [70, 98], energy: [0.05, 0.42], color: "#7986CB" },
+      { id: "chill-groove", label: "Chill groove", bpm: [88, 112], energy: [0.35, 0.58], color: "#AED581" },
       { id: "warmup", label: "Warm up", bpm: [80, 118], energy: [0.05, 0.58], color: "#5B8DEF" },
       { id: "closing", label: "Closing", bpm: [92, 126], energy: [0.05, 0.50], color: "#90A4AE" },
       { id: "playful", label: "Playful", bpm: [108, 134], energy: [0.40, 0.74], color: "#6FBF73" },
@@ -901,6 +903,14 @@
       document.getElementById("stat-links").textContent = edges.length;
       document.getElementById("stat-library").textContent = state.data.tracks.filter(t => t.source === "tracks").length;
       document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
+    }
+
+    function syncSourceFilterChips() {
+      const both = state.sources.has("tracks") && state.sources.has("to_curate");
+      document.querySelectorAll("#source-filters .chip").forEach(chip => {
+        const src = chip.dataset.source;
+        chip.classList.toggle("active", src === "all" ? both : state.sources.has(src));
+      });
     }
 
     function updatePlayButton() {
@@ -1333,15 +1343,14 @@
         chip.addEventListener("click", () => {
           const src = chip.dataset.source;
           if (src === "all") {
-            const allActive = state.sources.size === 2;
-            state.sources = allActive ? new Set() : new Set(["tracks", "to_curate"]);
-            document.querySelectorAll("#source-filters .chip").forEach(c => c.classList.toggle("active", !allActive || c.dataset.source === "all" || c.dataset.source === "tracks" || c.dataset.source === "to_curate"));
-            if (!allActive) document.querySelectorAll("#source-filters .chip").forEach(c => c.classList.add("active"));
-            else document.querySelectorAll("#source-filters .chip:not([data-source=all])").forEach(c => c.classList.remove("active"));
-            return;
+            const both = state.sources.has("tracks") && state.sources.has("to_curate");
+            state.sources = both ? new Set() : new Set(["tracks", "to_curate"]);
+          } else if (state.sources.has(src)) {
+            state.sources.delete(src);
+          } else {
+            state.sources.add(src);
           }
-          if (state.sources.has(src)) state.sources.delete(src); else state.sources.add(src);
-          chip.classList.toggle("active");
+          syncSourceFilterChips();
           renderGraph();
         });
       });
