@@ -393,22 +393,47 @@
     .player-title {
       font-weight: 600;
       font-size: 13px;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
       line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
-    .player-meta {
+    .player-artist {
       color: var(--muted);
       font-size: 11px;
       margin-bottom: 8px;
-      min-height: 16px;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .player-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    .player-badges[hidden],
+    .player-note[hidden] {
+      display: none !important;
+    }
+
+    .player-note {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 8px;
       line-height: 1.35;
     }
 
     .transport {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 5px;
+      grid-template-columns: 42px 1fr 42px;
+      gap: 6px;
       align-items: center;
       margin-bottom: 8px;
     }
@@ -417,6 +442,11 @@
       min-width: 0;
       width: 100%;
       padding: 7px 0;
+    }
+
+    .transport button.transport-main {
+      padding: 10px 0;
+      font-size: 15px;
     }
 
     .transport button.icon {
@@ -982,12 +1012,13 @@
 
       <div class="player">
         <div class="player-title" id="now-title">Nothing playing</div>
-        <div class="player-meta" id="now-meta">Click a node to preview</div>
+        <div class="player-artist" id="now-artist">Click a node to preview</div>
+        <div class="player-badges" id="now-badges" hidden></div>
+        <div class="player-note" id="now-note" hidden></div>
         <div class="transport">
-          <button class="secondary icon" id="prev-btn" title="Previous">◀</button>
-          <button class="icon" id="play-btn" title="Play / Pause">▶</button>
-          <button class="secondary icon" id="stop-btn" title="Stop">■</button>
-          <button class="secondary icon" id="next-btn" title="Next">▶|</button>
+          <button class="secondary icon" id="prev-btn" title="Previous in filtered list">◀</button>
+          <button class="icon transport-main" id="play-btn" title="Play / Pause">▶</button>
+          <button class="secondary icon" id="next-btn" title="Next in filtered list">▶|</button>
         </div>
         <div class="seek-wrap">
           <input id="seek" type="range" min="0" max="1000" value="0" disabled />
@@ -1841,12 +1872,44 @@
       tooltip.style.top = `${screen.y - LOUPE.size / 4}px`;
     }
 
-    function buildTrackTooltip(track) {
+    function trackBadgeHtml(track) {
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : null;
       const keyText = track.key || "?";
       const keyColor = camelotColor(track.key);
       const energy = (track.energy ?? 0.5).toFixed(2);
+      return `
+        <span class="tt-badge bpm">${bpmVal != null ? bpmVal : "?"} BPM</span>
+        <span class="tt-badge key" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
+        <span class="tt-badge energy" title="Estimated intensity (0–1)">Int ${energy}</span>
+      `;
+    }
 
+    function setPlayerIdle(subtitle = "Click a node to preview") {
+      document.getElementById("now-title").textContent = "Nothing playing";
+      document.getElementById("now-artist").textContent = subtitle;
+      document.getElementById("now-badges").hidden = true;
+      document.getElementById("now-badges").innerHTML = "";
+      document.getElementById("now-note").hidden = true;
+      document.getElementById("now-note").textContent = "";
+    }
+
+    function updatePlayerTrack(track, note) {
+      document.getElementById("now-title").textContent = track.title || "Unknown title";
+      document.getElementById("now-artist").textContent = track.artist || "Unknown artist";
+      const badges = document.getElementById("now-badges");
+      badges.hidden = false;
+      badges.innerHTML = trackBadgeHtml(track);
+      const noteEl = document.getElementById("now-note");
+      if (note) {
+        noteEl.hidden = false;
+        noteEl.textContent = note;
+      } else {
+        noteEl.hidden = true;
+        noteEl.textContent = "";
+      }
+    }
+
+    function buildTrackTooltip(track) {
       let warn = "";
       if (track.bpm_octave_corrected && track.bpm_raw != null && Math.abs(track.bpm - track.bpm_raw) >= 4) {
         warn = track.bpm_source === "tag"
@@ -1864,20 +1927,10 @@
       return `
         <div class="tooltip-title">${track.title || "Unknown title"}</div>
         <div class="tooltip-artist">${track.artist || "Unknown artist"}</div>
-        <div class="tooltip-badges">
-          <span class="tt-badge bpm">${bpmVal != null ? bpmVal : "?"} BPM</span>
-          <span class="tt-badge key" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
-          <span class="tt-badge energy" title="Estimated intensity (0–1)">Int ${energy}</span>
-        </div>
+        <div class="tooltip-badges">${trackBadgeHtml(track)}</div>
         ${warn ? `<div class="tooltip-warn">${warn}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
       `;
-    }
-
-    function trackMetaLine(track, extra) {
-      return [track.artist, track.bpm != null ? formatBpm(track) : null, track.key || null, track.genre, extra]
-        .filter(Boolean)
-        .join(" · ");
     }
 
     function rebuildPlayQueue(preferredId) {
@@ -1901,8 +1954,7 @@
       const track = state.playQueue[index];
       state.selectedId = track.id;
       state.playingId = track.id;
-      document.getElementById("now-title").textContent = track.title || "Unknown title";
-      document.getElementById("now-meta").textContent = trackMetaLine(track);
+      updatePlayerTrack(track);
       audio.src = `/api/audio/${track.id}`;
       if (autoplay) audio.play().catch(() => {});
       updatePlayButton();
@@ -1920,13 +1972,6 @@
       if (audio.paused) audio.play().catch(() => {});
       else audio.pause();
       updatePlayButton();
-    }
-
-    function stopPlayback() {
-      audio.pause();
-      audio.currentTime = 0;
-      updatePlayButton();
-      updateSeekUi();
     }
 
     function playRelative(step) {
@@ -2248,14 +2293,14 @@
           const { list } = mixNeighbors(active, tracks);
           const playing = state.data.tracks.find(t => t.id === active);
           if (playing && list.length) {
-            document.getElementById("now-meta").textContent = trackMetaLine(
+            updatePlayerTrack(
               playing,
               `${list.length} mixable neighbor${list.length === 1 ? "" : "s"}`
             );
           }
         } else if (state.playingId) {
           const playing = state.data.tracks.find(t => t.id === state.playingId);
-          if (playing) document.getElementById("now-meta").textContent = trackMetaLine(playing);
+          if (playing) updatePlayerTrack(playing);
         }
       }
 
@@ -2482,7 +2527,6 @@
       });
 
       document.getElementById("play-btn").addEventListener("click", togglePlayPause);
-      document.getElementById("stop-btn").addEventListener("click", stopPlayback);
       document.getElementById("prev-btn").addEventListener("click", () => playRelative(-1));
       document.getElementById("next-btn").addEventListener("click", () => playRelative(1));
 
@@ -2499,7 +2543,7 @@
 
       document.getElementById("neighbors-btn").addEventListener("click", () => {
         if (!state.selectedId) {
-          document.getElementById("now-meta").textContent = "Select a track on the graph first";
+          setPlayerIdle("Select a track on the graph first");
           return;
         }
         state.highlightNeighbors = !state.highlightNeighbors;
