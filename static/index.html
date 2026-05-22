@@ -531,7 +531,6 @@
       bpmMax: 180,
       zoomTransform: d3.zoomIdentity,
       zoomBehavior: null,
-      exploreViewFitted: false,
       prevLayout: "mix",
       viewport: null,
       axisLayer: null,
@@ -1114,14 +1113,9 @@
       drawGrid(viewport, x, y, plotWidth, plotHeight);
 
       tracks.forEach(t => {
-        if (state.layout === "explore") {
-          t.x = plotWidth / 2 + (Math.random() - 0.5) * plotWidth * 0.15;
-          t.y = plotHeight / 2 + (Math.random() - 0.5) * plotHeight * 0.15;
-        } else {
-          const pos = trackPosition(t, x, y, true, plotWidth, plotHeight);
-          t.x = pos.x;
-          t.y = pos.y;
-        }
+        const pos = trackPosition(t, x, y, true, plotWidth, plotHeight);
+        t.x = pos.x;
+        t.y = pos.y;
         t.fx = null;
         t.fy = null;
       });
@@ -1138,8 +1132,8 @@
           .force("y", d3.forceY(d => trackPosition(d, x, y, true, plotWidth, plotHeight).y).strength(0.2));
       } else {
         simulation
-          .force("x", d3.forceX(plotWidth / 2).strength(0.03))
-          .force("y", d3.forceY(plotHeight / 2).strength(0.03));
+          .force("x", d3.forceX(d => trackPosition(d, x, y, true, plotWidth, plotHeight).x).strength(0.06))
+          .force("y", d3.forceY(d => trackPosition(d, x, y, true, plotWidth, plotHeight).y).strength(0.12));
       }
 
       const link = viewport.append("g").attr("class", "links").selectAll("line").data(edges).join("line")
@@ -1273,20 +1267,12 @@
       refreshHighlight();
       state.refreshHighlight = refreshHighlight;
 
-      if (state.layout === "explore" && !state.exploreViewFitted) {
-        simulation.on("end", () => {
-          if (state.layout !== "explore") return;
-          resetView(false);
-          state.exploreViewFitted = true;
-        });
-      }
-
       if (state.highlightNeighbors && state.selectedId) {
         simulation.on("end", () => focusOnIds(neighborIds(state.selectedId)));
       }
 
       if (state.prevLayout !== state.layout) {
-        if (state.layout === "mix") resetView(false);
+        resetView(false);
         state.prevLayout = state.layout;
       }
       updateViewHint();
@@ -1295,14 +1281,12 @@
     function resetView(animate = true) {
       if (!state.svg || !state.zoomBehavior) return;
       const { plotWidth, plotHeight } = plotSize();
-      const transform = state.layout === "explore"
-        ? fitTransformToNodes(filteredTracks(), plotWidth, plotHeight)
-        : clampTransform(
-          d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
-          plotWidth,
-          plotHeight,
-          "mix"
-        );
+      const transform = clampTransform(
+        d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
+        plotWidth,
+        plotHeight,
+        state.layout
+      );
       state.zoomTransform = transform;
       if (animate) {
         state.svg.transition().duration(350).call(state.zoomBehavior.transform, transform);
@@ -1367,7 +1351,6 @@
           document.querySelectorAll("#layout-modes .chip").forEach(c => c.classList.remove("active"));
           chip.classList.add("active");
           state.layout = chip.dataset.layout;
-          if (state.layout === "explore") state.exploreViewFitted = false;
           renderGraph();
         });
       });

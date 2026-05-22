@@ -59,7 +59,7 @@ Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 ## UI conventions
 
 - Single frontend file: `static/index.html` (D3, no build step)
-- **Mix map** — BPM/energy placement; **Explore** — force layout over same grid background
+- **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
 - Set-moment clouds are fixed BPM×energy zones (visual only); toggle **Set moments**
 - Keep changes minimal; no new dependencies without good reason
 
