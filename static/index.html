@@ -1689,7 +1689,9 @@
       pointerDragged: false,
       zoomGestureStart: null,
       zoomGestureMoved: false,
-      hoveredId: null
+      hoveredId: null,
+      viewFilterSignature: null,
+      autoFitTimer: null
     };
 
     const audio = document.getElementById("audio");
@@ -3010,38 +3012,114 @@
       syncEllipsisTooltips(list);
     }
 
-    function focusOnIds(ids) {
+    function viewFilterSignature() {
+      return JSON.stringify({
+        moments: [...state.activeMoments].sort(),
+        keys: [...state.activeKeys].sort(),
+        genre: state.genre,
+        bpmMin: state.bpmMin,
+        bpmMax: state.bpmMax,
+        search: state.search.trim().toLowerCase(),
+        sources: [...state.sources].sort(),
+      });
+    }
+
+    function viewFiltersActive() {
+      const lo = PLOT.bpmDomain[0];
+      const hi = PLOT.bpmDomain[1];
+      return state.activeMoments.size > 0
+        || state.activeKeys.size > 0
+        || state.genre !== "all"
+        || state.search.trim() !== ""
+        || state.bpmMin > lo
+        || state.bpmMax < hi
+        || state.sources.size < 2;
+    }
+
+    function mixMapFitTransform(tracks, plotLeft, plotWidth, plotHeight) {
+      const pad = 50;
+      const minX = d3.min(tracks, t => t.x) - pad;
+      const maxX = d3.max(tracks, t => t.x) + pad;
+      const minY = d3.min(tracks, t => t.y) - pad;
+      const maxY = d3.max(tracks, t => t.y) + pad;
+      const dx = Math.max(maxX - minX, 80);
+      const dy = Math.max(maxY - minY, 80);
+      const scale = Math.min(8, Math.max(1, 0.82 / Math.max(dx / plotWidth, dy / plotHeight)));
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      return clampTransform(
+        d3.zoomIdentity
+          .translate(plotLeft, PLOT.margin.top)
+          .translate(plotWidth / 2, plotHeight / 2)
+          .scale(scale)
+          .translate(-cx, -cy),
+        plotLeft,
+        plotWidth,
+        plotHeight,
+        state.layout
+      );
+    }
+
+    function fitViewTransformForTracks(tracks) {
       const { plotLeft, plotWidth, plotHeight } = plotSize();
+      const pts = tracks.filter(t => t.x != null && t.y != null);
+      if (!pts.length || !state.svg || !state.zoomBehavior) return null;
+      return state.layout === "explore"
+        ? fitTransformToNodes(pts, plotLeft, plotWidth, plotHeight, 90)
+        : mixMapFitTransform(pts, plotLeft, plotWidth, plotHeight);
+    }
+
+    function applyViewTransform(transform, animate = true) {
+      if (!transform || !state.svg || !state.zoomBehavior) return;
+      state.zoomTransform = transform;
+      if (animate) {
+        state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
+      } else {
+        state.svg.call(state.zoomBehavior.transform, transform);
+      }
+    }
+
+    function fitViewToFilteredTracks(animate = true) {
+      applyViewTransform(fitViewTransformForTracks(filteredTracks()), animate);
+    }
+
+    function scheduleFilterViewFit(fn) {
+      if (state.autoFitTimer) clearTimeout(state.autoFitTimer);
+      state.autoFitTimer = setTimeout(() => {
+        state.autoFitTimer = null;
+        fn();
+      }, 220);
+    }
+
+    function maybeAutoFitViewForFilters(tracks, simulation) {
+      const sig = viewFilterSignature();
+      if (state.viewFilterSignature == null) {
+        state.viewFilterSignature = sig;
+        return;
+      }
+      if (sig === state.viewFilterSignature) return;
+      state.viewFilterSignature = sig;
+
+      if (!viewFiltersActive() || !tracks.length) {
+        scheduleFilterViewFit(() => resetView(true));
+        return;
+      }
+
+      const runFit = () => fitViewToFilteredTracks(true);
+      if (state.layout === "explore" && simulation) {
+        simulation.on("end.autofit", () => {
+          simulation.on("end.autofit", null);
+          runFit();
+        });
+        return;
+      }
+      scheduleFilterViewFit(runFit);
+    }
+
+    function focusOnIds(ids) {
       const tracks = filteredTracks().filter(t => ids.has(t.id) && t.x != null && t.y != null);
-      if (tracks.length < 1 || !state.svg || !state.zoomBehavior) return;
-
-      const transform = state.layout === "explore"
-        ? fitTransformToNodes(tracks, plotLeft, plotWidth, plotHeight, 90)
-        : (() => {
-          const pad = 50;
-          const minX = d3.min(tracks, t => t.x) - pad;
-          const maxX = d3.max(tracks, t => t.x) + pad;
-          const minY = d3.min(tracks, t => t.y) - pad;
-          const maxY = d3.max(tracks, t => t.y) + pad;
-          const dx = Math.max(maxX - minX, 80);
-          const dy = Math.max(maxY - minY, 80);
-          const scale = Math.min(8, Math.max(1, 0.82 / Math.max(dx / plotWidth, dy / plotHeight)));
-          const cx = (minX + maxX) / 2;
-          const cy = (minY + maxY) / 2;
-          return clampTransform(
-            d3.zoomIdentity
-              .translate(plotLeft, PLOT.margin.top)
-              .translate(plotWidth / 2, plotHeight / 2)
-              .scale(scale)
-              .translate(-cx, -cy),
-            plotLeft,
-            plotWidth,
-            plotHeight,
-            state.layout
-          );
-        })();
-
-      state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
+      if (tracks.length < 1) return;
+      applyViewTransform(fitViewTransformForTracks(tracks), true);
     }
 
     function syncSourceFilterChips() {
@@ -3685,6 +3763,8 @@
         state.prevLayout = state.layout;
       }
 
+      maybeAutoFitViewForFilters(tracks, simulation);
+
       updateSearchResults(tracks);
     }
 
@@ -3976,7 +4056,13 @@
 
       updateNeighborsButton(null, 0);
 
-      document.getElementById("reset-view-btn").addEventListener("click", () => resetView(true));
+      document.getElementById("reset-view-btn").addEventListener("click", () => {
+        if (state.autoFitTimer) {
+          clearTimeout(state.autoFitTimer);
+          state.autoFitTimer = null;
+        }
+        resetView(true);
+      });
 
       window.addEventListener("resize", () => {
         state.svg = null;
