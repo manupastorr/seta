@@ -2414,6 +2414,13 @@
       return PB.mixNeighbors(trackId, tracks, MIX_MIN_SCORE);
     }
 
+    function neighborAnchorId() {
+      if (state.highlightNeighbors && state.neighborQueueAnchor) {
+        return state.neighborQueueAnchor;
+      }
+      return state.selectedId;
+    }
+
     function neighborIds(trackId) {
       return mixNeighbors(trackId, filteredTracks()).ids;
     }
@@ -2441,19 +2448,18 @@
       return `<span class="neighbor-meta">${badges.join("")}</span>`;
     }
 
-    function neighborListItemHtml(track, { anchor = false, rank = null, score = null, playing = false, selected = false } = {}) {
+    function neighborListItemHtml(track, { anchor = false, rank = null, score = null, playing = false } = {}) {
       const rankClass = anchor ? "neighbor-rank is-dot" : "neighbor-rank";
       const rankLabel = anchor ? "" : (rank != null ? String(rank) : "");
-      const isActive = anchor || playing || selected;
       const classes = [
         "neighbor-item",
-        isActive ? "is-active" : "",
+        playing ? "is-active" : "",
       ].filter(Boolean).join(" ");
       const title = track.title || "Unknown title";
       const artist = track.artist || "Unknown artist";
       return `
         <li>
-          <button type="button" class="${classes}" data-track-id="${track.id}" role="option" aria-selected="${isActive ? "true" : "false"}">
+          <button type="button" class="${classes}" data-track-id="${track.id}" role="option" aria-selected="${playing ? "true" : "false"}">
             <span class="${rankClass}">${rankLabel}</span>
             <span class="neighbor-main">
               <span class="neighbor-title">${title}</span>
@@ -2477,7 +2483,7 @@
       const emptyEl = document.getElementById("neighbor-empty");
       if (!panel || !list || !countEl || !emptyEl) return;
 
-      const show = state.highlightNeighbors && !!state.selectedId;
+      const show = state.highlightNeighbors && !!neighborAnchorId();
       panel.classList.toggle("is-visible", show);
       panel.setAttribute("aria-hidden", show ? "false" : "true");
       if (!show) {
@@ -2487,8 +2493,9 @@
         return;
       }
 
-      const anchor = tracks.find(t => t.id === state.selectedId)
-        || state.data?.tracks.find(t => t.id === state.selectedId);
+      const anchorId = neighborAnchorId();
+      const anchor = tracks.find(t => t.id === anchorId)
+        || state.data?.tracks.find(t => t.id === anchorId);
       if (!anchor) {
         panel.classList.remove("is-visible");
         panel.setAttribute("aria-hidden", "true");
@@ -2497,7 +2504,7 @@
         return;
       }
 
-      const { list: neighbors } = mixNeighbors(state.selectedId, tracks);
+      const { list: neighbors } = mixNeighbors(anchorId, tracks);
       countEl.textContent = neighbors.length
         ? `${neighbors.length} mixable`
         : "Anchor only";
@@ -2506,7 +2513,6 @@
         list.innerHTML = neighborListItemHtml(anchor, {
           anchor: true,
           playing: state.playingId === anchor.id,
-          selected: true,
         });
         emptyEl.hidden = false;
       } else {
@@ -2515,18 +2521,16 @@
           neighborListItemHtml(anchor, {
             anchor: true,
             playing: state.playingId === anchor.id,
-            selected: state.selectedId === anchor.id,
           }),
           ...neighbors.map((track, index) => neighborListItemHtml(track, {
             rank: index + 1,
             score: mixScore(anchor, track),
             playing: state.playingId === track.id,
-            selected: state.selectedId === track.id,
           })),
         ].join("");
       }
 
-      scrollNeighborItemIntoView(state.playingId || state.selectedId);
+      scrollNeighborItemIntoView(state.playingId || anchorId);
     }
 
     function focusOnIds(ids) {
@@ -2718,7 +2722,11 @@
       state.playIndex = index;
       const track = state.playQueue[index];
       state.playingId = track.id;
-      if (!state.highlightNeighbors) state.selectedId = track.id;
+      if (state.highlightNeighbors) {
+        state.selectedId = state.neighborQueueAnchor;
+      } else {
+        state.selectedId = track.id;
+      }
       updatePlayerTrack(track);
       waveformWrap.classList.remove("is-empty");
       loadTrackAudio(track.id, autoplay);
@@ -2729,8 +2737,29 @@
     }
 
     function setNowPlaying(track, autoplay = true) {
+      if (state.highlightNeighbors) {
+        const anchorId = neighborAnchorId();
+        if (anchorId) {
+          const { ids } = mixNeighbors(anchorId, filteredTracks());
+          if (ids.has(track.id)) {
+            state.neighborQueueAnchor = anchorId;
+            state.selectedId = anchorId;
+            syncPlayQueue();
+            const idx = PB.resolvePlayIndex(state.playQueue, track.id);
+            if (idx >= 0) {
+              playTrackAt(idx, autoplay);
+              return;
+            }
+          }
+        }
+        state.selectedId = track.id;
+        state.neighborQueueAnchor = track.id;
+        syncPlayQueue();
+        const idx = PB.resolvePlayIndex(state.playQueue, track.id);
+        playTrackAt(idx >= 0 ? idx : 0, autoplay);
+        return;
+      }
       state.selectedId = track.id;
-      if (state.highlightNeighbors) state.neighborQueueAnchor = track.id;
       syncPlayQueue();
       const idx = PB.resolvePlayIndex(state.playQueue, track.id);
       playTrackAt(idx, autoplay);
@@ -2983,7 +3012,7 @@
 
       function updateMixLinks() {
         mixLinks.selectAll("*").remove();
-        const active = state.selectedId;
+        const active = neighborAnchorId();
         if (!active || !state.highlightNeighbors) return;
         const selected = tracks.find(t => t.id === active);
         if (!selected || selected.x == null) return;
@@ -3042,7 +3071,7 @@
       }
 
       function refreshHighlight() {
-        const active = state.selectedId;
+        const active = neighborAnchorId();
         const neighbors = active && state.highlightNeighbors ? neighborIds(active) : null;
         node.classed("selected", d => d.id === active);
         node.classed("playing", d => d.id === state.playingId);
@@ -3081,8 +3110,8 @@
       state.refreshHighlight = refreshHighlight;
       state.updateHoveredNode = updateHoveredNode;
 
-      if (state.highlightNeighbors && state.selectedId) {
-        simulation.on("end", () => focusOnIds(neighborIds(state.selectedId)));
+      if (state.highlightNeighbors && neighborAnchorId()) {
+        simulation.on("end", () => focusOnIds(neighborIds(neighborAnchorId())));
       }
 
       if (state.prevLayout !== state.layout) {
