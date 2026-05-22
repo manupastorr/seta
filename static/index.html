@@ -472,24 +472,6 @@
       line-height: 1.4;
     }
 
-    .status-item {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 4px;
-      white-space: nowrap;
-    }
-
-    .status-item.is-primary .status-value {
-      font-weight: 600;
-    }
-
-    .status-value {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text);
-      font-variant-numeric: tabular-nums;
-    }
-
     .bpm-range {
       position: relative;
       height: 28px;
@@ -1443,7 +1425,6 @@
       <div class="filter-bar-brand">
         <h1>Track Graph</h1>
         <p class="subtitle">BPM × intensity · mix hints</p>
-        <div class="library-status" id="library-status" aria-live="polite">–</div>
       </div>
 
       <div class="filter-bar-groups">
@@ -2937,20 +2918,6 @@
       state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
     }
 
-    function updateLibraryStatus(tracks) {
-      const el = document.getElementById("library-status");
-      if (!el || !state.data) return;
-      el.innerHTML = `
-        <span class="status-item is-primary">
-          <span class="status-value">${tracks.length}</span>
-          visible
-        </span>`;
-    }
-
-    function updateStats(tracks) {
-      updateLibraryStatus(tracks);
-    }
-
     function syncSourceFilterChips() {
       const both = state.sources.has("tracks") && state.sources.has("to_curate");
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
@@ -3387,7 +3354,6 @@
         hideLoupe();
       }
       const edges = visibleEdgeSet(tracks);
-      updateStats(tracks);
       syncPlayQueue();
 
       d3.select("#graph").classed("is-over-node", false).classed("layout-explore", state.layout === "explore");
@@ -3553,7 +3519,6 @@
           link.style("opacity", state.highlightNeighbors ? 0 : 1);
         }
         updateMixLinks();
-        updateLibraryStatus(tracks);
         updateNeighborsButton(active, neighbors ? neighbors.size : 0);
         updateNeighborList(tracks);
       }
