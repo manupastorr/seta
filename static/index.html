@@ -130,10 +130,48 @@
       color: var(--muted);
       font-size: 12px;
       margin-bottom: 10px;
+      min-height: 18px;
+    }
+
+    .transport {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .transport button {
+      min-width: 38px;
+      padding: 8px 10px;
+    }
+
+    .transport button.icon {
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .seek-wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .seek-wrap input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
     }
 
     .controls {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       align-items: center;
     }
@@ -176,42 +214,66 @@
       font-size: 11px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .grid-line {
+      stroke: rgba(0, 0, 0, 0.035);
+      stroke-width: 0.5;
+      pointer-events: none;
+    }
+
+    .grid-line.major {
+      stroke: rgba(0, 0, 0, 0.055);
+      stroke-width: 0.5;
+    }
+
+    .tick-label {
+      fill: var(--muted);
+      font-size: 9px;
+      pointer-events: none;
     }
 
     .link {
-      stroke: rgba(80, 80, 120, 0.12);
-      stroke-width: 1;
+      stroke: rgba(80, 80, 120, 0.05);
+      stroke-width: 0.5;
     }
 
-    .link.highlight {
-      stroke: rgba(107, 79, 216, 0.55);
-      stroke-width: 1.6;
+    .link.highlight,
+    .mix-link {
+      stroke: rgba(107, 79, 216, 0.28);
+      stroke-width: 0.75;
     }
 
     .node circle.core {
-      stroke-width: 2px;
+      stroke-width: 0.75px;
       cursor: pointer;
-      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.15));
     }
 
     .node.selected circle.core {
       stroke: #1a1a24;
-      stroke-width: 3px;
-      filter: drop-shadow(0 0 10px rgba(107, 79, 216, 0.5));
+      stroke-width: 1.25px;
+      filter: drop-shadow(0 0 4px rgba(107, 79, 216, 0.25));
+    }
+
+    .node.playing circle.core {
+      stroke: var(--accent);
+      stroke-width: 1.25px;
     }
 
     .node.to-curate circle.core {
-      stroke-dasharray: 4 3;
+      stroke-dasharray: 2 2;
+      stroke-width: 0.75px;
     }
 
     .node.dim circle.core {
-      opacity: 0.1;
+      opacity: 0.08;
     }
 
     .node.neighbor circle.core {
       stroke: var(--accent);
-      stroke-width: 3px;
-      filter: drop-shadow(0 0 8px rgba(107, 79, 216, 0.45));
+      stroke-width: 1.25px;
+      filter: none;
     }
 
     #neighbors-btn.active {
@@ -332,18 +394,30 @@
       <div class="player">
         <div class="player-title" id="now-title">Nothing playing</div>
         <div class="player-meta" id="now-meta">Click a node to preview</div>
+        <div class="transport">
+          <button class="secondary icon" id="prev-btn" title="Previous">◀</button>
+          <button class="icon" id="play-btn" title="Play / Pause">▶</button>
+          <button class="secondary icon" id="stop-btn" title="Stop">■</button>
+          <button class="secondary icon" id="next-btn" title="Next">▶|</button>
+        </div>
+        <div class="seek-wrap">
+          <input id="seek" type="range" min="0" max="1000" value="0" disabled />
+          <div class="time-row">
+            <span id="time-current">0:00</span>
+            <span id="time-total">0:00</span>
+          </div>
+        </div>
         <div class="controls">
-          <button id="play-btn">Play</button>
           <button class="secondary" id="neighbors-btn">Mix neighbors</button>
           <button class="secondary" id="reset-view-btn">Reset view</button>
         </div>
-        <audio id="audio" preload="none"></audio>
+        <audio id="audio" preload="metadata"></audio>
       </div>
     </aside>
 
     <main id="main">
       <div class="topbar">
-        <div class="pill">Scroll to zoom · drag background to pan · drag nodes to reposition</div>
+        <div class="pill">Scroll to zoom in · drag to pan · BPM × energy grid stays fixed</div>
         <div class="pill">Dashed ring = To Curate</div>
       </div>
       <div class="legend" id="legend"></div>
@@ -362,9 +436,18 @@
       "11A": "#6A1B9A", "11B": "#AB47BC", "12A": "#AD1457", "12B": "#EC407A"
     };
 
+    const PLOT = {
+      margin: { top: 36, right: 36, bottom: 52, left: 52 },
+      bpmDomain: [80, 180],
+      energyDomain: [0, 1]
+    };
+
     const state = {
       data: null,
       selectedId: null,
+      playingId: null,
+      playQueue: [],
+      playIndex: -1,
       highlightNeighbors: false,
       layout: "mix",
       sources: new Set(["tracks", "to_curate"]),
@@ -375,16 +458,116 @@
       zoomTransform: d3.zoomIdentity,
       zoomBehavior: null,
       viewport: null,
-      svg: null
+      axisLayer: null,
+      svg: null,
+      plotWidth: 0,
+      plotHeight: 0
     };
 
     const audio = document.getElementById("audio");
+    const seek = document.getElementById("seek");
     const tooltip = document.getElementById("tooltip");
 
     function camelotColor(key) {
       return CAMELOT_COLORS[key] || "#555770";
     }
 
+    function plotSize() {
+      const width = document.getElementById("main").clientWidth;
+      const height = window.innerHeight;
+      return {
+        width,
+        height,
+        plotWidth: width - PLOT.margin.left - PLOT.margin.right,
+        plotHeight: height - PLOT.margin.top - PLOT.margin.bottom
+      };
+    }
+
+    function bpmScale(plotWidth) {
+      return d3.scaleLinear()
+        .domain(PLOT.bpmDomain)
+        .range([0, plotWidth]);
+    }
+
+    function energyScale(plotHeight) {
+      return d3.scaleLinear()
+        .domain(PLOT.energyDomain)
+        .range([plotHeight, 0]);
+    }
+
+    function trackPosition(track, x, y) {
+      return {
+        x: track.bpm != null ? x(track.bpm) : x(PLOT.bpmDomain[0] + (PLOT.bpmDomain[1] - PLOT.bpmDomain[0]) / 2),
+        y: y(track.energy ?? 0.5)
+      };
+    }
+
+    function drawGrid(container, x, y, plotWidth, plotHeight) {
+      const grid = container.append("g").attr("class", "grid");
+
+      for (let bpm = PLOT.bpmDomain[0]; bpm <= PLOT.bpmDomain[1]; bpm += 20) {
+        const px = x(bpm);
+        grid.append("line")
+          .attr("class", "grid-line major")
+          .attr("x1", px).attr("x2", px)
+          .attr("y1", 0).attr("y2", plotHeight);
+        grid.append("text")
+          .attr("class", "tick-label")
+          .attr("x", px)
+          .attr("y", plotHeight + 14)
+          .attr("text-anchor", "middle")
+          .text(bpm);
+      }
+
+      for (let e = 0; e <= 1.001; e += 0.5) {
+        const py = y(e);
+        grid.append("line")
+          .attr("class", "grid-line major")
+          .attr("x1", 0).attr("x2", plotWidth)
+          .attr("y1", py).attr("y2", py);
+        grid.append("text")
+          .attr("class", "tick-label")
+          .attr("x", -8)
+          .attr("y", py + 3)
+          .attr("text-anchor", "end")
+          .text(e.toFixed(1));
+      }
+    }
+
+    function drawAxisLabels(layer, plotWidth, plotHeight) {
+      layer.selectAll("*").remove();
+      layer.append("text")
+        .attr("class", "axis-label")
+        .attr("x", PLOT.margin.left + plotWidth / 2)
+        .attr("y", PLOT.margin.top + plotHeight + 40)
+        .attr("text-anchor", "middle")
+        .text("BPM →");
+      layer.append("text")
+        .attr("class", "axis-label")
+        .attr("x", 16)
+        .attr("y", PLOT.margin.top + plotHeight / 2)
+        .attr("transform", `rotate(-90 16 ${PLOT.margin.top + plotHeight / 2})`)
+        .attr("text-anchor", "middle")
+        .text("Energy →");
+    }
+
+    function clampTransform(transform, plotWidth, plotHeight) {
+      const k = Math.max(1, Math.min(10, transform.k));
+      let x = transform.x;
+      let y = transform.y;
+      if (k <= 1.001) {
+        x = PLOT.margin.left;
+        y = PLOT.margin.top;
+      } else {
+        const minX = PLOT.margin.left + plotWidth * (1 - k);
+        const maxX = PLOT.margin.left;
+        const minY = PLOT.margin.top + plotHeight * (1 - k);
+        const maxY = PLOT.margin.top;
+        x = Math.min(maxX, Math.max(minX, x));
+        y = Math.min(maxY, Math.max(minY, y));
+      }
+      return d3.zoomIdentity.translate(x, y).scale(k);
+    }
     function formatDuration(sec) {
       if (!sec) return "–";
       const m = Math.floor(sec / 60);
@@ -464,27 +647,29 @@
     }
 
     function focusOnIds(ids) {
+      const { plotWidth, plotHeight } = plotSize();
       const tracks = filteredTracks().filter(t => ids.has(t.id) && t.x != null && t.y != null);
       if (tracks.length < 1 || !state.svg || !state.zoomBehavior) return;
 
-      const main = document.getElementById("main");
-      const width = main.clientWidth;
-      const height = window.innerHeight;
-      const pad = 90;
+      const pad = 50;
       const minX = d3.min(tracks, t => t.x) - pad;
       const maxX = d3.max(tracks, t => t.x) + pad;
       const minY = d3.min(tracks, t => t.y) - pad;
       const maxY = d3.max(tracks, t => t.y) + pad;
-      const dx = Math.max(maxX - minX, 120);
-      const dy = Math.max(maxY - minY, 120);
-      const scale = Math.min(6, 0.85 / Math.max(dx / width, dy / height));
+      const dx = Math.max(maxX - minX, 80);
+      const dy = Math.max(maxY - minY, 80);
+      const scale = Math.min(8, Math.max(1, 0.82 / Math.max(dx / plotWidth, dy / plotHeight)));
       const cx = (minX + maxX) / 2;
       const cy = (minY + maxY) / 2;
-      const transform = d3.zoomIdentity
-        .translate(width / 2, height / 2)
-        .scale(scale)
-        .translate(-cx, -cy);
-
+      const transform = clampTransform(
+        d3.zoomIdentity
+          .translate(PLOT.margin.left, PLOT.margin.top)
+          .translate(plotWidth / 2, plotHeight / 2)
+          .scale(scale)
+          .translate(-cx, -cy),
+        plotWidth,
+        plotHeight
+      );
       state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
     }
 
@@ -495,16 +680,88 @@
       document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
     }
 
-    function setNowPlaying(track) {
+    function updatePlayButton() {
+      document.getElementById("play-btn").textContent = audio.paused ? "▶" : "❚❚";
+    }
+
+    function updateSeekUi() {
+      const total = audio.duration;
+      const current = audio.currentTime;
+      if (!Number.isFinite(total) || total <= 0) {
+        seek.disabled = true;
+        seek.value = 0;
+        document.getElementById("time-current").textContent = "0:00";
+        document.getElementById("time-total").textContent = "0:00";
+        return;
+      }
+      seek.disabled = false;
+      seek.value = Math.round((current / total) * 1000);
+      document.getElementById("time-current").textContent = formatDuration(current);
+      document.getElementById("time-total").textContent = formatDuration(total);
+    }
+
+    function trackMetaLine(track, extra) {
+      return [track.artist, track.bpm ? `${track.bpm} BPM` : null, track.key || null, track.genre, extra]
+        .filter(Boolean)
+        .join(" · ");
+    }
+
+    function rebuildPlayQueue(preferredId) {
+      state.playQueue = filteredTracks();
+      if (!state.playQueue.length) {
+        state.playIndex = -1;
+        return;
+      }
+      if (preferredId) {
+        const idx = state.playQueue.findIndex(t => t.id === preferredId);
+        state.playIndex = idx >= 0 ? idx : 0;
+      } else if (state.playIndex >= state.playQueue.length) {
+        state.playIndex = state.playQueue.length - 1;
+      }
+    }
+
+    function playTrackAt(index, autoplay = true) {
+      if (!state.playQueue.length) rebuildPlayQueue(state.playingId || state.selectedId);
+      if (!state.playQueue.length || index < 0 || index >= state.playQueue.length) return;
+      state.playIndex = index;
+      const track = state.playQueue[index];
+      state.selectedId = track.id;
+      state.playingId = track.id;
       document.getElementById("now-title").textContent = track.title || "Unknown title";
-      document.getElementById("now-meta").textContent = [
-        track.artist,
-        track.bpm ? `${track.bpm} BPM` : null,
-        track.key || null,
-        track.genre
-      ].filter(Boolean).join(" · ");
+      document.getElementById("now-meta").textContent = trackMetaLine(track);
       audio.src = `/api/audio/${track.id}`;
-      audio.play().catch(() => {});
+      if (autoplay) audio.play().catch(() => {});
+      updatePlayButton();
+      state.refreshHighlight?.();
+    }
+
+    function setNowPlaying(track, autoplay = true) {
+      state.playQueue = filteredTracks();
+      const idx = state.playQueue.findIndex(t => t.id === track.id);
+      playTrackAt(idx >= 0 ? idx : 0, autoplay);
+    }
+
+    function togglePlayPause() {
+      if (!audio.src) return;
+      if (audio.paused) audio.play().catch(() => {});
+      else audio.pause();
+      updatePlayButton();
+    }
+
+    function stopPlayback() {
+      audio.pause();
+      audio.currentTime = 0;
+      updatePlayButton();
+      updateSeekUi();
+    }
+
+    function playRelative(step) {
+      rebuildPlayQueue(state.playingId || state.selectedId);
+      if (!state.playQueue.length) return;
+      let idx = state.playIndex >= 0 ? state.playIndex + step : 0;
+      if (idx < 0) idx = state.playQueue.length - 1;
+      if (idx >= state.playQueue.length) idx = 0;
+      playTrackAt(idx, true);
     }
 
     function buildLegend() {
@@ -533,21 +790,27 @@
       const tracks = filteredTracks();
       const edges = visibleEdgeSet(tracks);
       updateStats(tracks, edges);
+      rebuildPlayQueue(state.playingId || state.selectedId);
 
-      const width = document.getElementById("main").clientWidth;
-      const height = window.innerHeight;
+      const { width, height, plotWidth, plotHeight } = plotSize();
+      state.plotWidth = plotWidth;
+      state.plotHeight = plotHeight;
+      const x = bpmScale(plotWidth);
+      const y = energyScale(plotHeight);
       let svg = d3.select("#graph");
 
       if (state.svg && state.viewport) {
         state.viewport.selectAll("*").remove();
+        drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
       } else {
         svg.selectAll("*").remove();
-        svg = svg
-          .attr("viewBox", `0 0 ${width} ${height}`)
-          .attr("preserveAspectRatio", "xMidYMid meet");
+        svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+        state.axisLayer = svg.append("g").attr("class", "axis-layer");
+        state.viewport = svg.append("g").attr("class", "viewport");
 
         const zoom = d3.zoom()
-          .scaleExtent([0.15, 12])
+          .scaleExtent([1, 10])
           .filter((event) => {
             if (event.type === "wheel") return true;
             if (event.type.startsWith("touch")) return true;
@@ -559,22 +822,25 @@
           .on("start", () => svg.classed("is-panning", true))
           .on("end", () => svg.classed("is-panning", false))
           .on("zoom", (event) => {
-            state.zoomTransform = event.transform;
-            state.viewport.attr("transform", event.transform);
+            const next = clampTransform(event.transform, plotWidth, plotHeight);
+            state.zoomTransform = next;
+            state.viewport.attr("transform", next);
           });
 
         state.zoomBehavior = zoom;
-        state.viewport = svg.append("g").attr("class", "viewport");
         state.svg = svg;
-
+        state.zoomTransform = clampTransform(
+          d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
+          plotWidth,
+          plotHeight
+        );
         svg.call(zoom).call(zoom.transform, state.zoomTransform);
+        drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
       }
 
       svg.attr("viewBox", `0 0 ${width} ${height}`);
-
-      const bpmExtent = d3.extent(tracks.filter(t => t.bpm != null), d => d.bpm) || [120, 130];
-      const x = d3.scaleLinear().domain([Math.max(80, bpmExtent[0] - 2), (bpmExtent[1] || 130) + 2]).range([80, width - 40]);
-      const y = d3.scaleLinear().domain([0, 1]).range([height - 60, 40]);
+      state.viewport.attr("transform", state.zoomTransform);
+      drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
 
       const viewport = state.viewport;
 
@@ -582,30 +848,35 @@
         .attr("class", "zoom-surface")
         .attr("x", 0)
         .attr("y", 0)
-        .attr("width", width)
-        .attr("height", height)
+        .attr("width", plotWidth)
+        .attr("height", plotHeight)
         .attr("fill", "transparent")
         .style("pointer-events", "all");
 
-      viewport.append("text").attr("class", "axis-label").attr("x", width / 2).attr("y", height - 16).attr("text-anchor", "middle").text("BPM →");
-      viewport.append("text").attr("class", "axis-label").attr("x", 18).attr("y", height / 2).attr("transform", `rotate(-90 18 ${height / 2})`).attr("text-anchor", "middle").text("Energy →");
+      drawGrid(viewport, x, y, plotWidth, plotHeight);
 
       tracks.forEach(t => {
-        t.x = t.bpm != null ? x(t.bpm) : width / 2;
-        t.y = y(t.energy ?? 0.5);
+        const pos = trackPosition(t, x, y);
+        t.x = pos.x;
+        t.y = pos.y;
+        if (state.layout === "mix") {
+          t.fx = pos.x;
+          t.fy = pos.y;
+        } else {
+          t.fx = null;
+          t.fy = null;
+        }
       });
 
       const simulation = d3.forceSimulation(tracks)
-        .force("link", d3.forceLink(edges).id(d => d.id).distance(d => 120 - d.score * 60).strength(d => d.score * 0.35))
-        .force("charge", d3.forceManyBody().strength(-18))
-        .force("collide", d3.forceCollide().radius(10));
+        .force("link", d3.forceLink(edges).id(d => d.id).distance(d => 90 - d.score * 40).strength(d => state.layout === "explore" ? d.score * 0.35 : 0))
+        .force("charge", d3.forceManyBody().strength(state.layout === "explore" ? -20 : -4))
+        .force("collide", d3.forceCollide().radius(5));
 
-      if (state.layout === "mix") {
+      if (state.layout === "explore") {
         simulation
-          .force("x", d3.forceX(d => d.bpm != null ? x(d.bpm) : width / 2).strength(0.85))
-          .force("y", d3.forceY(d => y(d.energy ?? 0.5)).strength(0.85));
-      } else {
-        simulation.force("x", d3.forceX(width / 2).strength(0.03)).force("y", d3.forceY(height / 2).strength(0.03));
+          .force("x", d3.forceX(plotWidth / 2).strength(0.03))
+          .force("y", d3.forceY(plotHeight / 2).strength(0.03));
       }
 
       const link = viewport.append("g").attr("class", "links").selectAll("line").data(edges).join("line")
@@ -633,6 +904,7 @@
 
       const drag = d3.drag()
         .clickDistance(4)
+        .filter(() => state.layout === "explore")
         .on("start", (event, d) => {
           event.sourceEvent.stopPropagation();
           if (!event.active) simulation.alphaTarget(0.25).restart();
@@ -647,23 +919,23 @@
         })
         .on("end", (event, d) => {
           if (!event.active) simulation.alphaTarget(0);
-          if (state.layout === "mix") { d.fx = null; d.fy = null; }
         });
 
       const node = viewport.append("g").attr("class", "nodes").selectAll("g").data(tracks).join("g")
-        .attr("class", d => `node ${d.source === "to_curate" ? "to-curate" : ""}`)
+        .attr("class", d => `node ${d.source === "to_curate" ? "to-curate" : ""} ${d.id === state.playingId ? "playing" : ""}`)
         .call(drag);
 
       node.append("circle")
         .attr("class", "core")
-        .attr("r", d => 5 + (d.duration_sec ? Math.min(d.duration_sec / 120, 1.5) : 0))
+        .attr("r", d => 3 + (d.duration_sec ? Math.min(d.duration_sec / 180, 1) : 0))
         .attr("fill", d => camelotColor(d.key))
-        .attr("stroke", d => d.source === "to_curate" ? "#d48806" : "rgba(0,0,0,0.2)");
+        .attr("stroke", d => d.source === "to_curate" ? "#d48806" : "rgba(0,0,0,0.12)");
 
       function refreshHighlight() {
         const active = state.selectedId;
         const neighbors = active && state.highlightNeighbors ? neighborIds(active) : null;
         node.classed("selected", d => d.id === active);
+        node.classed("playing", d => d.id === state.playingId);
         node.classed("neighbor", d => neighbors && neighbors.has(d.id) && d.id !== active);
         node.classed("dim", d => neighbors && !neighbors.has(d.id));
         link.classed("highlight", e => {
@@ -675,11 +947,16 @@
 
         if (active && state.highlightNeighbors) {
           const { list } = mixNeighbors(active, tracks);
-          const meta = document.getElementById("now-meta");
           const playing = state.data.tracks.find(t => t.id === active);
           if (playing && list.length) {
-            meta.textContent = `${list.length} mixable neighbor${list.length === 1 ? "" : "s"} · ${playing.bpm || "?"} BPM · ${playing.key || "?"}`;
+            document.getElementById("now-meta").textContent = trackMetaLine(
+              playing,
+              `${list.length} mixable neighbor${list.length === 1 ? "" : "s"}`
+            );
           }
+        } else if (state.playingId) {
+          const playing = state.data.tracks.find(t => t.id === state.playingId);
+          if (playing) document.getElementById("now-meta").textContent = trackMetaLine(playing);
         }
       }
 
@@ -699,12 +976,19 @@
       }).on("mouseleave", () => {
         tooltip.style.opacity = 0;
       }).on("click", (_, d) => {
-        state.selectedId = d.id;
         setNowPlaying(d);
-        refreshHighlight();
       });
 
       simulation.on("tick", () => {
+        if (state.layout === "mix") {
+          tracks.forEach(t => {
+            const pos = trackPosition(t, x, y);
+            t.fx = pos.x;
+            t.fy = pos.y;
+            t.x = pos.x;
+            t.y = pos.y;
+          });
+        }
         link
           .attr("x1", d => d.source.x)
           .attr("y1", d => d.source.y)
@@ -718,20 +1002,22 @@
       state.refreshHighlight = refreshHighlight;
 
       if (state.highlightNeighbors && state.selectedId) {
-        simulation.on("end", () => {
-          focusOnIds(neighborIds(state.selectedId));
-        });
+        simulation.on("end", () => focusOnIds(neighborIds(state.selectedId)));
       }
     }
 
     function resetView(animate = true) {
       if (!state.svg || !state.zoomBehavior) return;
-      state.zoomTransform = d3.zoomIdentity;
-      const svg = state.svg;
+      const { plotWidth, plotHeight } = plotSize();
+      state.zoomTransform = clampTransform(
+        d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
+        plotWidth,
+        plotHeight
+      );
       if (animate) {
-        svg.transition().duration(350).call(state.zoomBehavior.transform, d3.zoomIdentity);
+        state.svg.transition().duration(350).call(state.zoomBehavior.transform, state.zoomTransform);
       } else {
-        svg.call(state.zoomBehavior.transform, d3.zoomIdentity);
+        state.svg.call(state.zoomBehavior.transform, state.zoomTransform);
       }
     }
 
@@ -795,9 +1081,21 @@
         });
       });
 
-      document.getElementById("play-btn").addEventListener("click", () => {
-        if (audio.src) audio.paused ? audio.play() : audio.pause();
+      document.getElementById("play-btn").addEventListener("click", togglePlayPause);
+      document.getElementById("stop-btn").addEventListener("click", stopPlayback);
+      document.getElementById("prev-btn").addEventListener("click", () => playRelative(-1));
+      document.getElementById("next-btn").addEventListener("click", () => playRelative(1));
+
+      seek.addEventListener("input", () => {
+        if (!Number.isFinite(audio.duration)) return;
+        audio.currentTime = (Number(seek.value) / 1000) * audio.duration;
+        updateSeekUi();
       });
+      audio.addEventListener("timeupdate", updateSeekUi);
+      audio.addEventListener("loadedmetadata", updateSeekUi);
+      audio.addEventListener("play", updatePlayButton);
+      audio.addEventListener("pause", updatePlayButton);
+      audio.addEventListener("ended", () => playRelative(1));
 
       document.getElementById("neighbors-btn").addEventListener("click", () => {
         if (!state.selectedId) {
@@ -819,6 +1117,7 @@
       window.addEventListener("resize", () => {
         state.svg = null;
         state.viewport = null;
+        state.axisLayer = null;
         state.zoomBehavior = null;
         renderGraph();
       });
