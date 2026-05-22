@@ -96,6 +96,27 @@
       margin-top: 2px;
     }
 
+    .bpm-range-track {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.12);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bpm-range-fill {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
     .bpm-range input[type="range"] {
       position: absolute;
       left: 0;
@@ -107,18 +128,19 @@
       background: transparent;
       -webkit-appearance: none;
       appearance: none;
+      z-index: 1;
     }
 
     .bpm-range input[type="range"]::-webkit-slider-runnable-track {
       height: 4px;
       border-radius: 999px;
-      background: rgba(0, 0, 0, 0.12);
+      background: transparent;
     }
 
     .bpm-range input[type="range"]::-moz-range-track {
       height: 4px;
       border-radius: 999px;
-      background: rgba(0, 0, 0, 0.12);
+      background: transparent;
     }
 
     .bpm-range input[type="range"]::-webkit-slider-thumb {
@@ -776,6 +798,7 @@
 
       <label>BPM range <span id="bpm-label"></span></label>
       <div class="bpm-range">
+        <div class="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
         <input id="bpm-min" type="range" min="70" max="180" value="70" />
         <input id="bpm-max" type="range" min="70" max="180" value="180" />
       </div>
@@ -2045,6 +2068,14 @@
 
       function updateBpmLabel() {
         document.getElementById("bpm-label").textContent = `${state.bpmMin}–${state.bpmMax}`;
+        const lo = Number(document.getElementById("bpm-min").min);
+        const hi = Number(document.getElementById("bpm-min").max);
+        const span = hi - lo || 1;
+        const left = ((state.bpmMin - lo) / span) * 100;
+        const width = ((state.bpmMax - state.bpmMin) / span) * 100;
+        const fill = document.getElementById("bpm-range-fill");
+        fill.style.left = `${left}%`;
+        fill.style.width = `${width}%`;
       }
 
       function syncBpmInputs() {
