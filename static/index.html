@@ -28,68 +28,221 @@
     }
 
     #app {
-      --sidebar-width: 272px;
+      --mix-dock-width: 0px;
+      --filter-bar-height: 88px;
       --player-height: 72px;
       display: grid;
-      grid-template-columns: var(--sidebar-width) 1fr;
-      grid-template-rows: 1fr var(--player-height);
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr var(--player-height);
       height: 100vh;
       position: relative;
-      --ui-left: 338px;
+      --ui-left: 18px;
       --ui-right: 214px;
     }
 
-    aside {
-      position: relative;
-      z-index: 2;
-      grid-column: 1;
+    .filter-bar {
       grid-row: 1;
-      max-height: 100%;
-      width: var(--sidebar-width);
-      min-width: 0;
-      border-right: 1px solid rgba(0, 0, 0, 0.06);
-      background: rgba(255, 255, 255, 0.72);
-      backdrop-filter: blur(12px);
-      padding: 16px 14px 18px;
+      grid-column: 1;
+      z-index: 5;
       display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      align-items: flex-start;
+      gap: 14px 18px;
+      padding: 10px 14px 11px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
     }
 
-    .sidebar-controls {
+    .filter-bar-brand {
       flex-shrink: 0;
-      min-height: 0;
-      overflow-y: auto;
+      min-width: 0;
     }
 
-    .neighbor-panel {
-      flex: 0 0 0;
+    .filter-bar-brand h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .filter-bar-brand .subtitle {
+      margin: 2px 0 4px;
+      font-size: 10px;
+    }
+
+    .filter-bar-groups {
+      flex: 1 1 420px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      min-width: 0;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .filter-label-inline {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .filter-group-search {
+      flex: 1 1 200px;
+      max-width: 300px;
+    }
+
+    .search-field {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .filter-bar #search {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+
+    .search-results {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      width: max(100%, 280px);
+      max-height: min(340px, 42vh);
+      overflow-y: auto;
+      z-index: 12;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+      padding: 4px;
+    }
+
+    .search-results[hidden] {
+      display: none !important;
+    }
+
+    .search-results-more {
+      margin: 4px 8px 6px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .search-result-item.is-active {
+      background: var(--accent-soft);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .search-result-item {
+      grid-template-columns: minmax(0, 1fr) auto;
+      width: 100%;
+      text-align: left;
+    }
+
+    .filter-bar #genre {
+      width: auto;
+      min-width: 118px;
+      max-width: 160px;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .filter-group-bpm {
+      flex: 1 1 170px;
+      max-width: 250px;
+      min-width: 150px;
+    }
+
+    .filter-group-bpm .bpm-range {
+      flex: 1;
+      height: 24px;
+      margin: 0;
+      min-width: 72px;
+    }
+
+    .filter-group-bpm .bpm-reset {
+      flex-shrink: 0;
+    }
+
+    .filter-group-map {
+      flex: 1 1 280px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group-map #view-controls {
+      flex: 1 1 auto;
+    }
+
+    .filter-group-map .secondary {
+      padding: 6px 9px;
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      grid-row: 2;
+      grid-column: 1;
+      position: relative;
       min-height: 0;
-      max-height: 0;
+      overflow: hidden;
+    }
+
+    .mix-dock {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      bottom: 10px;
+      width: 248px;
+      z-index: 4;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      margin: 0;
-      padding: 0;
-      border-top: 1px solid transparent;
+      padding: 12px 11px;
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
     }
 
-    .neighbor-panel.is-visible {
-      flex: 1 1 0;
-      max-height: none;
-      margin-top: 10px;
-      padding-top: 10px;
+    .mix-dock.is-visible {
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
-      border-top-color: var(--panel-border);
     }
 
-    .neighbor-panel.is-visible.is-collapsed {
-      flex: 0 0 auto;
+    .mix-dock.is-visible.is-collapsed {
+      bottom: auto;
+      height: auto;
+      max-height: none;
     }
 
     .neighbor-panel-header {
@@ -101,7 +254,7 @@
       margin-bottom: 6px;
     }
 
-    .neighbor-panel.is-collapsed .neighbor-panel-header {
+    .mix-dock.is-collapsed .neighbor-panel-header {
       margin-bottom: 0;
     }
 
@@ -137,7 +290,7 @@
       transition: transform 0.15s ease, border-color 0.15s ease;
     }
 
-    .neighbor-panel.is-collapsed .neighbor-panel-chevron {
+    .mix-dock.is-collapsed .neighbor-panel-chevron {
       transform: rotate(-45deg);
       margin-top: -0.5px;
       margin-left: 1px;
@@ -151,7 +304,7 @@
       overflow: hidden;
     }
 
-    .neighbor-panel.is-collapsed .neighbor-panel-body {
+    .mix-dock.is-collapsed .neighbor-panel-body {
       display: none;
     }
 
@@ -272,11 +425,6 @@
       color: var(--muted);
     }
 
-    .sidebar-header {
-      margin-bottom: 10px;
-      flex-shrink: 0;
-    }
-
     h1 {
       margin: 0 0 3px;
       font-size: 21px;
@@ -285,25 +433,29 @@
       line-height: 1.1;
     }
 
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 12px 0 5px;
+    }
+
+    input[type="search"], select, input[type="range"] {
+      width: 100%;
+    }
+
+    .filter-bar input[type="search"],
+    .filter-bar select {
+      width: auto;
+    }
+
     .subtitle {
       margin: 0;
       color: var(--muted);
       font-size: 11px;
       line-height: 1.4;
-    }
-
-    .library-status {
-      display: flex;
-      flex-wrap: nowrap;
-      gap: 10px;
-      margin: 0 0 10px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--panel-border);
-      min-height: 22px;
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.3;
-      flex-shrink: 0;
     }
 
     .status-item {
@@ -322,24 +474,6 @@
       font-weight: 500;
       color: var(--text);
       font-variant-numeric: tabular-nums;
-    }
-
-    label {
-      display: block;
-      color: var(--muted);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin: 12px 0 5px;
-    }
-
-    aside > label:first-of-type,
-    .sidebar-controls > label:first-of-type {
-      margin-top: 0;
-    }
-
-    input[type="search"], select, input[type="range"] {
-      width: 100%;
     }
 
     .bpm-range {
@@ -531,56 +665,9 @@
     }
 
     #view-controls {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px;
-    }
-
-    #view-controls #moments-toggle {
-      grid-column: 1 / -1;
-    }
-
-    .sidebar-section-map {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--panel-border);
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .sidebar-hint {
-      margin: 8px 0 0;
-      font-size: 10px;
-      line-height: 1.35;
-      color: var(--muted);
-    }
-
-    .sidebar-hint-filters {
-      margin-top: 6px;
-    }
-
-    .sidebar-hint-layout {
-      margin: 0;
-    }
-
-    .sidebar-section-map label {
-      margin: 0;
-    }
-
-    .map-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 6px;
-      margin-top: 0;
-    }
-
-    .map-actions button {
-      width: 100%;
-      min-width: 0;
-      padding: 7px 8px;
-      font-size: 11px;
-      line-height: 1.2;
+      flex-wrap: wrap;
+      gap: 5px;
     }
 
     .chip {
@@ -617,8 +704,8 @@
     }
 
     .player-dock {
-      grid-column: 1 / -1;
-      grid-row: 2;
+      grid-column: 1;
+      grid-row: 3;
       z-index: 6;
       display: flex;
       align-items: center;
@@ -855,8 +942,8 @@
     #main {
       position: relative;
       z-index: 1;
-      grid-column: 1 / -1;
-      grid-row: 1;
+      width: 100%;
+      height: 100%;
       background: transparent;
       overflow: visible;
       pointer-events: none;
@@ -1339,55 +1426,60 @@
 </head>
 <body>
   <div id="app">
-    <aside>
-      <header class="sidebar-header">
+    <header class="filter-bar" id="filter-bar">
+      <div class="filter-bar-brand">
         <h1>Track Graph</h1>
         <p class="subtitle">BPM × intensity · mix hints</p>
-      </header>
+        <div class="library-status" id="library-status" aria-live="polite">–</div>
+      </div>
 
-      <div class="library-status" id="library-status" aria-live="polite">–</div>
-
-      <div class="sidebar-controls">
-        <label for="search">Search</label>
-        <input id="search" type="search" placeholder="Artist or title…" />
-
-        <label>Source</label>
-        <div class="chip-row" id="source-filters">
-          <button class="chip active" data-source="all">All</button>
-          <button class="chip" data-source="tracks">Library</button>
-          <button class="chip" data-source="to_curate">Curate</button>
+      <div class="filter-bar-groups">
+        <div class="filter-group filter-group-search">
+          <label class="sr-only" for="search">Search</label>
+          <div class="search-field">
+            <input id="search" type="search" placeholder="Artist or title…" autocomplete="off" />
+            <div class="search-results" id="search-results" hidden role="listbox" aria-label="Search results"></div>
+          </div>
         </div>
 
-        <label for="genre">Genre / batch</label>
-        <select id="genre"><option value="all">All genres</option></select>
+        <div class="filter-group">
+          <span class="filter-label-inline">Source</span>
+          <div class="chip-row" id="source-filters">
+            <button class="chip active" data-source="all">All</button>
+            <button class="chip" data-source="tracks">Library</button>
+            <button class="chip" data-source="to_curate">Curate</button>
+          </div>
+        </div>
 
-        <div class="bpm-range-header">
-          <label for="bpm-min">BPM range <span id="bpm-label"></span></label>
+        <div class="filter-group">
+          <label class="filter-label-inline" for="genre">Genre</label>
+          <select id="genre"><option value="all">All genres</option></select>
+        </div>
+
+        <div class="filter-group filter-group-bpm">
+          <label class="filter-label-inline" for="bpm-min">BPM <span id="bpm-label"></span></label>
           <button type="button" class="bpm-reset" id="bpm-reset" title="Reset BPM range" aria-label="Reset BPM range" disabled>↺</button>
+          <div class="bpm-range">
+            <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
+            <input id="bpm-min" type="range" min="70" max="180" value="70" />
+            <input id="bpm-max" type="range" min="70" max="180" value="180" />
+          </div>
         </div>
-        <div class="bpm-range">
-          <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
-          <input id="bpm-min" type="range" min="70" max="180" value="70" />
-          <input id="bpm-max" type="range" min="70" max="180" value="180" />
-        </div>
-        <p class="sidebar-hint sidebar-hint-filters">Search, source, genre, and BPM filter here.</p>
 
-        <div class="sidebar-section sidebar-section-map">
-          <label>Map</label>
+        <div class="filter-group filter-group-map">
           <div class="chip-row" id="view-controls">
             <button class="chip active" data-layout="mix">Mix map</button>
             <button class="chip" data-layout="explore">Mix links</button>
             <button class="chip active" id="moments-toggle">Set moments</button>
           </div>
-          <p class="sidebar-hint sidebar-hint-layout">Mix map = BPM × energy truth · Mix links = harmonic ties (positions approximate)</p>
-          <div class="map-actions">
-            <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
-            <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
-          </div>
+          <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
+          <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
       </div>
+    </header>
 
-      <div class="neighbor-panel" id="neighbor-panel" aria-hidden="true">
+    <div class="workspace" id="workspace">
+      <div class="mix-dock" id="neighbor-panel" aria-hidden="true">
         <div class="neighbor-panel-header">
           <button type="button" class="neighbor-panel-toggle" id="neighbor-panel-toggle" aria-expanded="true" aria-controls="neighbor-panel-body">
             <span class="neighbor-panel-chevron" aria-hidden="true"></span>
@@ -1400,9 +1492,8 @@
           <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
         </div>
       </div>
-    </aside>
 
-    <main id="main">
+      <main id="main">
       <div class="legend" id="legend"></div>
       <div class="moments-legend" id="moments-legend" hidden></div>
       <div class="tooltip" id="tooltip"></div>
@@ -1411,6 +1502,7 @@
       </div>
       <svg id="graph"></svg>
     </main>
+    </div>
 
     <footer class="player-dock" id="player-dock" aria-label="Now playing">
       <div class="player-dock-inner">
@@ -1462,6 +1554,7 @@
     const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5, clickPickRadius: 10, hoverRadiusBoost: 5 };
     const ELLIPSIS_TIP_SHOW_MS = 100;
     const ELLIPSIS_TIP_SELECTOR = ".player-title, .player-artist, .neighbor-title, .neighbor-artist";
+    const SEARCH_MAX_RESULTS = 12;
     let ellipsisTipEl = null;
     let ellipsisTipTimer = null;
     let ellipsisTipAnchor = null;
@@ -1505,6 +1598,8 @@
       sources: new Set(["tracks", "to_curate"]),
       genre: "all",
       search: "",
+      searchResultsIndex: -1,
+      searchResultsOpen: false,
       bpmMin: 70,
       bpmMax: 180,
       zoomTransform: d3.zoomIdentity,
@@ -1923,9 +2018,15 @@
       return hovered ? base + LOUPE.hoverRadiusBoost : base;
     }
 
-    function sidebarWidth() {
-      const aside = document.querySelector("aside");
-      return aside ? aside.getBoundingClientRect().width : 320;
+    function mixDockWidth() {
+      const panel = document.getElementById("neighbor-panel");
+      if (!panel?.classList.contains("is-visible") || panel.classList.contains("is-collapsed")) return 0;
+      return Math.ceil(panel.getBoundingClientRect().width) + 10;
+    }
+
+    function filterBarHeight() {
+      const bar = document.getElementById("filter-bar");
+      return bar ? Math.ceil(bar.getBoundingClientRect().height) : 0;
     }
 
     function playerDockHeight() {
@@ -1939,9 +2040,15 @@
         const h = Math.ceil(dock.getBoundingClientRect().height);
         document.getElementById("app").style.setProperty("--player-height", `${h}px`);
       }
-      const uiLeft = sidebarWidth() + 18;
-      const uiRight = 214; // moments legend width + padding
+      const bar = document.getElementById("filter-bar");
+      if (bar) {
+        document.getElementById("app").style.setProperty("--filter-bar-height", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+      }
+      const mixWidth = mixDockWidth();
+      const uiLeft = mixWidth + 18;
+      document.getElementById("app").style.setProperty("--mix-dock-width", `${mixWidth}px`);
       document.getElementById("app").style.setProperty("--ui-left", `${uiLeft}px`);
+      const uiRight = 214; // moments legend width + padding
       document.getElementById("app").style.setProperty("--ui-right", `${uiRight}px`);
     }
 
@@ -1961,7 +2068,7 @@
     function isNodeObscured(node) {
       const screen = trackScreenPoint(node);
       if (!screen) return false;
-      if (screen.x < sidebarWidth() - 1) return true;
+      if (screen.x < mixDockWidth() + 8) return true;
       return screen.y > window.innerHeight - playerDockHeight() - 10;
     }
 
@@ -2029,7 +2136,7 @@
 
     function tryPlayTrackAt(event) {
       if (state.pointerDragged || !state.viewport) return;
-      if (event.clientX < sidebarWidth()) return;
+      if (event.clientX < mixDockWidth() + 8) return;
       const [px, py] = d3.pointer(event, state.viewport.node());
       const { plotWidth, plotHeight } = plotSize();
       if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
@@ -2114,8 +2221,8 @@
 
     function plotSize() {
       const width = document.getElementById("app").clientWidth;
-      const height = Math.max(200, window.innerHeight - playerDockHeight());
-      const plotLeft = sidebarWidth() + PLOT.margin.left;
+      const height = Math.max(200, window.innerHeight - playerDockHeight() - filterBarHeight());
+      const plotLeft = mixDockWidth() + PLOT.margin.left;
       const plotWidth = Math.max(120, width - plotLeft - PLOT.margin.right);
       return {
         width,
@@ -2462,8 +2569,119 @@
       if (!state.search.trim() || !state.data) return false;
       const tracks = filteredTracks();
       if (tracks.length !== 1) return false;
+      hideSearchResults();
       setNowPlaying(tracks[0]);
       return true;
+    }
+
+    function hideSearchResults() {
+      const el = document.getElementById("search-results");
+      if (!el) return;
+      el.hidden = true;
+      el.innerHTML = "";
+      state.searchResultsIndex = -1;
+      state.searchResultsOpen = false;
+    }
+
+    function searchResultItemHtml(track, index, { active = false, playing = false } = {}) {
+      const title = track.title || "Unknown title";
+      const artist = track.artist || "Unknown artist";
+      const classes = [
+        "neighbor-item",
+        "search-result-item",
+        active ? "is-active" : "",
+        playing ? "is-playing" : "",
+      ].filter(Boolean).join(" ");
+      return `<button type="button" class="${classes}" data-track-id="${track.id}" data-search-index="${index}" role="option" aria-selected="${active ? "true" : "false"}">
+        <span class="neighbor-main">
+          <span class="neighbor-title">${title}</span>
+          <span class="neighbor-artist">${artist}</span>
+        </span>
+        ${neighborTrackMetaHtml(track)}
+      </button>`;
+    }
+
+    function updateSearchResults(tracks) {
+      const el = document.getElementById("search-results");
+      const input = document.getElementById("search");
+      if (!el || !input) return;
+
+      const q = state.search.trim();
+      if (!q || !state.searchResultsOpen) {
+        hideSearchResults();
+        return;
+      }
+
+      if (!tracks.length) {
+        el.hidden = false;
+        el.innerHTML = `<div class="search-results-more">No matches</div>`;
+        state.searchResultsIndex = -1;
+        return;
+      }
+
+      const visible = tracks.slice(0, SEARCH_MAX_RESULTS);
+      const more = tracks.length - visible.length;
+      if (state.searchResultsIndex >= visible.length) {
+        state.searchResultsIndex = visible.length - 1;
+      }
+
+      el.innerHTML = visible.map((track, index) => searchResultItemHtml(track, index, {
+        active: index === state.searchResultsIndex,
+        playing: state.playingId === track.id,
+      })).join("") + (more > 0
+        ? `<div class="search-results-more">${more} more on the map…</div>`
+        : "");
+      el.hidden = false;
+      syncEllipsisTooltips(el);
+    }
+
+    function activateSearchResult(index) {
+      const tracks = filteredTracks();
+      const track = tracks[index];
+      if (!track) return;
+      hideSearchResults();
+      setNowPlaying(track);
+    }
+
+    function moveSearchResultsHighlight(delta) {
+      const tracks = filteredTracks().slice(0, SEARCH_MAX_RESULTS);
+      if (!tracks.length) return;
+      if (state.searchResultsIndex < 0) {
+        state.searchResultsIndex = delta > 0 ? 0 : tracks.length - 1;
+      } else {
+        state.searchResultsIndex = (state.searchResultsIndex + delta + tracks.length) % tracks.length;
+      }
+      updateSearchResults(filteredTracks());
+      const active = document.querySelector(`.search-result-item[data-search-index="${state.searchResultsIndex}"]`);
+      active?.scrollIntoView({ block: "nearest" });
+    }
+
+    function handleSearchKeydown(event) {
+      const tracks = filteredTracks();
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        state.searchResultsOpen = true;
+        moveSearchResultsHighlight(1);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        state.searchResultsOpen = true;
+        moveSearchResultsHighlight(-1);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        hideSearchResults();
+        return;
+      }
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      if (state.searchResultsIndex >= 0 && tracks[state.searchResultsIndex]) {
+        activateSearchResult(state.searchResultsIndex);
+        return;
+      }
+      tryPlaySingleSearchResult();
     }
 
     function filteredTracks() {
@@ -3141,8 +3359,9 @@
     }
 
     function renderGraph() {
-      syncUiLayout();
       const tracks = filteredTracks();
+      updateNeighborList(tracks);
+      syncUiLayout();
       if (state.hoveredId && !tracks.some(t => t.id === state.hoveredId)) {
         state.hoveredId = null;
         tooltip.style.opacity = 0;
@@ -3351,6 +3570,8 @@
         resetView(false);
         state.prevLayout = state.layout;
       }
+
+      updateSearchResults(tracks);
     }
 
     function resetView(animate = true) {
@@ -3460,13 +3681,31 @@
 
       document.getElementById("search").addEventListener("input", e => {
         state.search = e.target.value;
+        state.searchResultsIndex = -1;
+        state.searchResultsOpen = !!state.search.trim();
         renderGraph();
       });
 
-      document.getElementById("search").addEventListener("keydown", e => {
-        if (e.key !== "Enter") return;
-        e.preventDefault();
-        tryPlaySingleSearchResult();
+      document.getElementById("search").addEventListener("focus", () => {
+        if (!state.search.trim()) return;
+        state.searchResultsOpen = true;
+        updateSearchResults(filteredTracks());
+      });
+
+      document.getElementById("search").addEventListener("blur", () => {
+        setTimeout(() => hideSearchResults(), 150);
+      });
+
+      document.getElementById("search").addEventListener("keydown", handleSearchKeydown);
+
+      document.getElementById("search-results").addEventListener("mousedown", event => {
+        event.preventDefault();
+      });
+
+      document.getElementById("search-results").addEventListener("click", event => {
+        const btn = event.target.closest(".search-result-item");
+        if (!btn?.dataset.trackId) return;
+        activateSearchResult(Number(btn.dataset.searchIndex));
       });
 
       document.getElementById("genre").addEventListener("change", e => {
@@ -3563,6 +3802,20 @@
           if (state.data) renderGraph();
         }).observe(playerDock);
       }
+      const filterBar = document.getElementById("filter-bar");
+      if (filterBar) {
+        new ResizeObserver(() => {
+          syncUiLayout();
+          if (state.data) renderGraph();
+        }).observe(filterBar);
+      }
+      const neighborPanel = document.getElementById("neighbor-panel");
+      if (neighborPanel) {
+        new ResizeObserver(() => {
+          syncUiLayout();
+          if (state.data) renderGraph();
+        }).observe(neighborPanel);
+      }
       syncUiLayout();
       audio.addEventListener("timeupdate", updateSeekUi);
       audio.addEventListener("loadedmetadata", updateSeekUi);
@@ -3585,7 +3838,7 @@
           state.neighborQueueAnchor = null;
           syncPlayQueue();
         }
-        state.refreshHighlight?.();
+        renderGraph();
       });
 
       document.getElementById("neighbor-list").addEventListener("click", (event) => {
@@ -3599,6 +3852,7 @@
         if (!state.highlightNeighbors) return;
         state.neighborQueueCollapsed = !state.neighborQueueCollapsed;
         syncNeighborPanelCollapse();
+        renderGraph();
       });
 
       updateNeighborsButton(null, 0);
