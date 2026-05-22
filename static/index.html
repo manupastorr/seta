@@ -626,6 +626,15 @@
       stroke-width: 1.25px;
     }
 
+    #graph-loupe .loupe-hover-ring {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1px;
+      vector-effect: non-scaling-stroke;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
     #graph.layout-explore .node circle.core {
       pointer-events: all;
       cursor: inherit;
@@ -1029,7 +1038,7 @@
 
     const LOW_BPM_CONFIDENCE = 0.45;
     const MIX_MIN_SCORE = 0.55;
-    const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5 };
+    const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5, clickPickRadius: 10, hoverRadiusBoost: 5 };
 
     const PLOT = {
       margin: { top: 44, right: 36, bottom: 52, left: 64 },
@@ -1083,7 +1092,8 @@
       pointerDown: null,
       pointerDragged: false,
       zoomGestureStart: null,
-      zoomGestureMoved: false
+      zoomGestureMoved: false,
+      hoveredId: null
     };
 
     const audio = document.getElementById("audio");
@@ -1121,14 +1131,9 @@
       ].join(" ");
     }
 
-    function nodeVisualRadius(track) {
-      return 3 + (track.duration_sec ? Math.min(track.duration_sec / 180, 1) : 0);
-    }
-
-    function nodeHoverRadius(track, strict = false) {
-      const visual = nodeVisualRadius(track);
-      if (strict) return Math.max(visual * 0.82, 2.4);
-      return visual + 1;
+    function nodeVisualRadius(track, hovered = false) {
+      const base = 3 + (track.duration_sec ? Math.min(track.duration_sec / 180, 1) : 0);
+      return hovered ? base + LOUPE.hoverRadiusBoost : base;
     }
 
     function sidebarWidth() {
@@ -1157,24 +1162,44 @@
       return screen.x < sidebarWidth() - 1;
     }
 
-    function trackAt(px, py, tracks, strict = shouldShowLoupe()) {
-      let hovered = null;
+    function closestTrackAt(px, py, tracks, maxScreenPx) {
+      const maxDist = maxScreenPx / (state.zoomTransform?.k ?? 1);
+      let closest = null;
       let bestDist = Infinity;
       for (const track of tracks) {
         if (track.x == null || track.y == null) continue;
         if (isNodeBehindSidebar(track)) continue;
-        const limit = nodeHoverRadius(track, strict);
         const dist = Math.hypot(track.x - px, track.y - py);
-        if (dist <= limit && dist < bestDist) {
+        if (dist < bestDist) {
           bestDist = dist;
-          hovered = track;
+          closest = track;
         }
       }
-      return hovered;
+      return closest && bestDist <= maxDist ? closest : null;
     }
 
-    function shouldShowLoupe() {
-      return state.zoomTransform.k * LOUPE.hitRadius < LOUPE.hideWhenHitPx;
+    function trackScreenPosition(track) {
+      if (!track || track.x == null || track.y == null || !state.viewport) return null;
+      const layer = state.viewport.node();
+      const svg = layer.ownerSVGElement;
+      if (!layer || !svg) return null;
+      const pt = svg.createSVGPoint();
+      pt.x = track.x;
+      pt.y = track.y;
+      const ctm = layer.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm);
+    }
+
+    function showLoupeForTrack(track, tracks) {
+      const screen = trackScreenPosition(track);
+      if (!screen) return;
+      const loupeEl = document.getElementById("graph-loupe");
+      loupeEl.hidden = false;
+      loupeEl.style.left = `${screen.x}px`;
+      loupeEl.style.top = `${screen.y}px`;
+      state.loupePointer = { x: track.x, y: track.y };
+      renderLoupe(track.x, track.y, tracks);
     }
 
     function hideLoupe() {
@@ -1185,17 +1210,26 @@
     function hideGraphHover() {
       d3.select("#graph").classed("is-over-node", false);
       tooltip.style.opacity = 0;
+      hideLoupe();
+      if (state.hoveredId) {
+        state.hoveredId = null;
+        state.updateHoveredNode?.();
+      }
     }
 
     function updateGraphHover(event, px, py, tracks) {
-      const hovered = trackAt(px, py, tracks, shouldShowLoupe());
+      const hovered = closestTrackAt(px, py, tracks, LOUPE.clickPickRadius);
       if (!hovered) {
         hideGraphHover();
         return;
       }
+      const prevHoveredId = state.hoveredId;
+      state.hoveredId = hovered.id;
+      if (prevHoveredId !== state.hoveredId) state.updateHoveredNode?.();
+      showLoupeForTrack(hovered, tracks);
       d3.select("#graph").classed("is-over-node", true);
       tooltip.style.opacity = 1;
-      positionTooltip(event);
+      positionTooltipForTrack(hovered);
       tooltip.innerHTML = buildTrackTooltip(hovered);
     }
 
@@ -1205,7 +1239,7 @@
       const [px, py] = d3.pointer(event, state.viewport.node());
       const { plotWidth, plotHeight } = plotSize();
       if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
-      const track = trackAt(px, py, state.renderedTracks, shouldShowLoupe());
+      const track = closestTrackAt(px, py, state.renderedTracks, LOUPE.clickPickRadius);
       if (track) setNowPlaying(track);
     }
 
@@ -1239,16 +1273,6 @@
           return;
         }
         updateGraphHover(event, px, py, state.renderedTracks);
-        if (!shouldShowLoupe()) {
-          hideLoupe();
-          return;
-        }
-        const loupeEl = document.getElementById("graph-loupe");
-        loupeEl.hidden = false;
-        loupeEl.style.left = `${event.clientX}px`;
-        loupeEl.style.top = `${event.clientY}px`;
-        state.loupePointer = { x: px, y: py };
-        renderLoupe(px, py, state.renderedTracks);
       });
 
       svg.on("pointerup.graph pointercancel.graph", (event) => {
@@ -1271,6 +1295,7 @@
         if (track.x == null || track.y == null) return false;
         return Math.hypot(track.x - viewportX, track.y - viewportY) <= LOUPE.sourceRadius;
       });
+      nearby.sort((a, b) => Number(a.id === state.hoveredId) - Number(b.id === state.hoveredId));
 
       svg.selectAll("circle.loupe-node")
         .data(nearby, d => d.id)
@@ -1278,17 +1303,26 @@
         .attr("class", "loupe-node")
         .attr("cx", d => center + (d.x - viewportX) * scale)
         .attr("cy", d => center + (d.y - viewportY) * scale)
-        .attr("r", d => nodeVisualRadius(d) * scale)
+        .attr("r", d => nodeVisualRadius(d, d.id === state.hoveredId) * scale)
         .attr("fill", d => camelotColor(d.key))
-        .attr("stroke", "rgba(0,0,0,0.14)")
-        .attr("stroke-width", 0.75);
+        .attr("stroke", d => d.id === state.hoveredId ? "var(--accent)" : "rgba(0,0,0,0.14)")
+        .attr("stroke-width", d => d.id === state.hoveredId ? 1.25 : 0.75);
+
+      const hovered = nearby.find(d => d.id === state.hoveredId);
+      svg.selectAll("circle.loupe-hover-ring")
+        .data(hovered ? [hovered] : [])
+        .join("circle")
+        .attr("class", "loupe-hover-ring")
+        .attr("cx", d => center + (d.x - viewportX) * scale)
+        .attr("cy", d => center + (d.y - viewportY) * scale)
+        .attr("r", d => (nodeVisualRadius(d, true) + 4) * scale);
 
       svg.selectAll("circle.loupe-reticle")
-        .data([0])
+        .data(hovered ? [hovered] : [])
         .join("circle")
         .attr("class", "loupe-reticle")
-        .attr("cx", center)
-        .attr("cy", center)
+        .attr("cx", d => center + (d.x - viewportX) * scale)
+        .attr("cy", d => center + (d.y - viewportY) * scale)
         .attr("r", 4);
     }
 
@@ -1818,9 +1852,11 @@
       return `${track.bpm} BPM`;
     }
 
-    function positionTooltip(event) {
-      tooltip.style.left = `${event.clientX + 14}px`;
-      tooltip.style.top = `${event.clientY + 10}px`;
+    function positionTooltipForTrack(track) {
+      const screen = trackScreenPosition(track);
+      if (!screen) return;
+      tooltip.style.left = `${screen.x + LOUPE.size / 2 + 10}px`;
+      tooltip.style.top = `${screen.y - LOUPE.size / 4}px`;
     }
 
     function buildTrackTooltip(track) {
@@ -2039,7 +2075,10 @@
           state.zoomTransform = next;
           viewport.attr("transform", next);
           syncAxisTickLabels(next);
-          if (!shouldShowLoupe()) hideLoupe();
+          if (state.hoveredId) {
+            const hovered = state.renderedTracks.find(t => t.id === state.hoveredId);
+            if (hovered) showLoupeForTrack(hovered, state.renderedTracks);
+          }
         });
       svg.call(state.zoomBehavior);
       svg.call(state.zoomBehavior.transform, state.zoomTransform);
@@ -2048,6 +2087,11 @@
     function renderGraph() {
       syncUiLayout();
       const tracks = filteredTracks();
+      if (state.hoveredId && !tracks.some(t => t.id === state.hoveredId)) {
+        state.hoveredId = null;
+        tooltip.style.opacity = 0;
+        hideLoupe();
+      }
       const edges = visibleEdgeSet(tracks);
       updateStats(tracks);
       rebuildPlayQueue(state.playingId || state.selectedId);
@@ -2197,6 +2241,12 @@
         .attr("fill", d => camelotColor(d.key))
         .attr("stroke", "rgba(0,0,0,0.12)");
 
+      function updateHoveredNode() {
+        const hoveredId = state.hoveredId;
+        node.classed("hovered", d => d.id === hoveredId);
+        if (hoveredId) node.filter(d => d.id === hoveredId).raise();
+      }
+
       function refreshHighlight() {
         const active = state.selectedId;
         const neighbors = active && state.highlightNeighbors ? neighborIds(active) : null;
@@ -2240,13 +2290,15 @@
         node.attr("transform", d => `translate(${d.x},${d.y})`);
         node.classed("obscured", d => isNodeBehindSidebar(d));
         if (state.highlightNeighbors) updateMixLinks();
-        if (state.loupePointer && shouldShowLoupe()) {
-          renderLoupe(state.loupePointer.x, state.loupePointer.y, tracks);
+        if (state.hoveredId) {
+          const hovered = tracks.find(t => t.id === state.hoveredId);
+          if (hovered) showLoupeForTrack(hovered, tracks);
         }
       });
 
       refreshHighlight();
       state.refreshHighlight = refreshHighlight;
+      state.updateHoveredNode = updateHoveredNode;
 
       if (state.highlightNeighbors && state.selectedId) {
         simulation.on("end", () => focusOnIds(neighborIds(state.selectedId)));
