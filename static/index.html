@@ -2456,6 +2456,14 @@
       PB.syncPlayQueueState(state, filteredTracks(), playbackSelection());
     }
 
+    function tryPlaySingleSearchResult() {
+      if (!state.search.trim() || !state.data) return false;
+      const tracks = filteredTracks();
+      if (tracks.length !== 1) return false;
+      setNowPlaying(tracks[0]);
+      return true;
+    }
+
     function filteredTracks() {
       const q = state.search.trim().toLowerCase();
       return state.data.tracks.filter(t => {
@@ -3447,6 +3455,12 @@
       document.getElementById("search").addEventListener("input", e => {
         state.search = e.target.value;
         renderGraph();
+      });
+
+      document.getElementById("search").addEventListener("keydown", e => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        tryPlaySingleSearchResult();
       });
 
       document.getElementById("genre").addEventListener("change", e => {
