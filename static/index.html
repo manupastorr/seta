@@ -37,7 +37,7 @@
       height: 100vh;
       position: relative;
       --ui-left: 18px;
-      --ui-right: 18px;
+      --ui-right: 214px;
     }
 
     .filter-bar {
@@ -210,55 +210,6 @@
       font-size: 11px;
       line-height: 1.2;
       white-space: nowrap;
-    }
-
-    .filter-collapsible {
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .filter-collapsible-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .filter-collapsible-chevron {
-      width: 6px;
-      height: 6px;
-      margin-top: -1px;
-      border-right: 2px solid currentColor;
-      border-bottom: 2px solid currentColor;
-      box-sizing: border-box;
-      transform: rotate(45deg);
-      transition: transform 0.15s ease;
-      opacity: 0.72;
-      flex-shrink: 0;
-    }
-
-    .filter-collapsible.is-open .filter-collapsible-chevron {
-      transform: rotate(-135deg);
-      margin-top: 1px;
-    }
-
-    .filter-collapsible-panel {
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      z-index: 13;
-      min-width: 196px;
-    }
-
-    .filter-collapsible-panel[hidden] {
-      display: none !important;
-    }
-
-    .filter-collapsible-panel .legend,
-    .filter-collapsible-panel .moments-legend {
-      position: static;
-      right: auto;
-      top: auto;
-      bottom: auto;
     }
 
     .workspace {
@@ -997,13 +948,15 @@
       pointer-events: none;
     }
 
-    #main > :not(#graph):not(.topbar):not(.tooltip):not(#graph-loupe) {
+    #main > :not(#graph):not(.topbar):not(.legend):not(.moments-legend):not(.tooltip):not(#graph-loupe) {
       pointer-events: auto;
       position: relative;
       z-index: 1;
     }
 
-    #main > .topbar {
+    #main > .topbar,
+    #main > .legend,
+    #main > .moments-legend {
       position: absolute;
       pointer-events: auto;
     }
@@ -1168,6 +1121,12 @@
     }
 
     .legend {
+      --camelot-panel-body-height: 228px;
+      --camelot-bottom-gap: 46px;
+      position: absolute;
+      right: 18px;
+      top: calc(100% - var(--camelot-bottom-gap) - var(--camelot-panel-body-height));
+      bottom: auto;
       width: 196px;
       max-width: 196px;
       background: var(--panel);
@@ -1175,7 +1134,68 @@
       border-radius: 14px;
       padding: 8px 10px 10px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      z-index: 4;
+      pointer-events: auto;
       overflow: hidden;
+    }
+
+    .legend-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      min-height: 20px;
+    }
+
+    .legend.is-collapsed .legend-panel-header,
+    .moments-legend.is-collapsed .legend-panel-header {
+      margin-bottom: 0;
+    }
+
+    .legend-panel-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+      border: none;
+      background: none;
+      padding: 2px 0;
+      font: inherit;
+      cursor: pointer;
+      color: inherit;
+      text-align: left;
+    }
+
+    .legend-panel-toggle:hover .filter-header-title,
+    .legend-panel-toggle:hover .legend-panel-chevron {
+      color: var(--text);
+      border-color: var(--text);
+    }
+
+    .legend-panel-chevron {
+      flex-shrink: 0;
+      width: 7px;
+      height: 7px;
+      margin-top: -0.5px;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      box-sizing: border-box;
+      transform: rotate(45deg);
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .legend.is-collapsed .legend-panel-chevron,
+    .moments-legend.is-collapsed .legend-panel-chevron {
+      transform: rotate(-45deg);
+      margin-top: -0.5px;
+      margin-left: 1px;
+    }
+
+    .legend.is-collapsed .legend-panel-body,
+    .moments-legend.is-collapsed .legend-panel-body {
+      display: none;
     }
 
     .legend-title {
@@ -1379,6 +1399,9 @@
     }
 
     .moments-legend {
+      position: absolute;
+      right: 18px;
+      top: 18px;
       background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 14px;
@@ -1386,6 +1409,8 @@
       width: 196px;
       max-width: 196px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      z-index: 4;
+      pointer-events: auto;
       overflow: hidden;
     }
 
@@ -1512,27 +1537,6 @@
             <button class="chip active" data-layout="mix">Mix map</button>
             <button class="chip" data-layout="explore">Mix links</button>
           </div>
-
-          <div class="filter-collapsible" id="moments-filter">
-            <button type="button" class="chip filter-collapsible-toggle" id="moments-filter-toggle" aria-expanded="false" aria-controls="moments-filter-panel">
-              <span class="filter-collapsible-chevron" aria-hidden="true"></span>
-              Set moments
-            </button>
-            <div class="filter-collapsible-panel" id="moments-filter-panel" hidden>
-              <div class="moments-legend" id="moments-legend"></div>
-            </div>
-          </div>
-
-          <div class="filter-collapsible" id="camelot-filter">
-            <button type="button" class="chip filter-collapsible-toggle" id="camelot-filter-toggle" aria-expanded="false" aria-controls="camelot-filter-panel">
-              <span class="filter-collapsible-chevron" aria-hidden="true"></span>
-              Camelot
-            </button>
-            <div class="filter-collapsible-panel" id="camelot-filter-panel" hidden>
-              <div class="legend" id="legend"></div>
-            </div>
-          </div>
-
           <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
           <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
@@ -1555,6 +1559,8 @@
       </div>
 
       <main id="main">
+      <div class="moments-legend" id="moments-legend"></div>
+      <div class="legend" id="legend"></div>
       <div class="tooltip" id="tooltip"></div>
       <div id="graph-loupe" hidden aria-hidden="true">
         <svg id="loupe-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
@@ -1650,8 +1656,8 @@
       highlightNeighbors: false,
       neighborQueueAnchor: null,
       neighborQueueCollapsed: false,
-      momentsPanelOpen: false,
-      camelotPanelOpen: false,
+      momentsLegendCollapsed: false,
+      camelotLegendCollapsed: false,
       layout: "mix",
       activeMoments: new Set(),
       activeKeys: new Set(),
@@ -2140,7 +2146,7 @@
       const uiLeft = mixWidth + 18;
       document.getElementById("app").style.setProperty("--mix-dock-width", `${mixWidth}px`);
       document.getElementById("app").style.setProperty("--ui-left", `${uiLeft}px`);
-      const uiRight = 18;
+      const uiRight = 214; // moments legend width + padding
       document.getElementById("app").style.setProperty("--ui-right", `${uiRight}px`);
     }
 
@@ -2472,11 +2478,17 @@
       const filterOn = state.activeMoments.size > 0;
       legend.classList.toggle("is-filtering", filterOn);
       legend.innerHTML = `
-        <div class="filter-header moments-legend-header">
-          <span class="moments-legend-hint filter-hint filter-hint-block">${filterOn ? "Showing tracks in selected zones" : "Click a zone to filter tracks"}</span>
+        <div class="legend-panel-header">
+          <button type="button" class="legend-panel-toggle" aria-expanded="${state.momentsLegendCollapsed ? "false" : "true"}" aria-controls="moments-legend-body">
+            <span class="legend-panel-chevron" aria-hidden="true"></span>
+            <span class="moments-legend-title filter-header-title">Set moments</span>
+          </button>
           <button type="button" class="bpm-reset moments-reset" title="Reset filters" aria-label="Reset set moment filters"${filterOn ? "" : " disabled"}>↺</button>
         </div>
-        <div class="moments-legend-grid"></div>`;
+        <div class="legend-panel-body" id="moments-legend-body">
+          <span class="moments-legend-hint filter-hint">${filterOn ? "Showing tracks in selected zones" : "Click a zone to filter tracks"}</span>
+          <div class="moments-legend-grid"></div>
+        </div>`;
       const grid = legend.querySelector(".moments-legend-grid");
       SET_MOMENTS.forEach(moment => {
         const row = document.createElement("button");
@@ -2487,7 +2499,7 @@
         row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label">${moment.label}</span>`;
         grid.appendChild(row);
       });
-      syncFilterCollapsibles();
+      syncMomentsLegendCollapse();
     }
 
     function resetMomentsFilter() {
@@ -2496,39 +2508,20 @@
       renderGraph();
     }
 
-    function syncFilterCollapsible(rootId, toggleId, panelId, open, filtering) {
-      const root = document.getElementById(rootId);
-      const toggle = document.getElementById(toggleId);
-      const panel = document.getElementById(panelId);
-      if (!root || !toggle || !panel) return;
-      root.classList.toggle("is-open", open);
-      root.classList.toggle("is-filtering", filtering);
-      toggle.classList.toggle("active", open || filtering);
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      panel.hidden = !open;
+    function syncMomentsLegendCollapse() {
+      const legend = document.getElementById("moments-legend");
+      const toggle = legend?.querySelector(".legend-panel-toggle");
+      if (!legend || !toggle) return;
+      legend.classList.toggle("is-collapsed", state.momentsLegendCollapsed);
+      toggle.setAttribute("aria-expanded", state.momentsLegendCollapsed ? "false" : "true");
     }
 
-    function syncFilterCollapsibles() {
-      syncFilterCollapsible(
-        "moments-filter",
-        "moments-filter-toggle",
-        "moments-filter-panel",
-        state.momentsPanelOpen,
-        state.activeMoments.size > 0
-      );
-      syncFilterCollapsible(
-        "camelot-filter",
-        "camelot-filter-toggle",
-        "camelot-filter-panel",
-        state.camelotPanelOpen,
-        state.activeKeys.size > 0
-      );
-    }
-
-    function closeFilterCollapsibles() {
-      state.momentsPanelOpen = false;
-      state.camelotPanelOpen = false;
-      syncFilterCollapsibles();
+    function syncCamelotLegendCollapse() {
+      const legend = document.getElementById("legend");
+      const toggle = legend?.querySelector(".legend-panel-toggle");
+      if (!legend || !toggle) return;
+      legend.classList.toggle("is-collapsed", state.camelotLegendCollapsed);
+      toggle.setAttribute("aria-expanded", state.camelotLegendCollapsed ? "false" : "true");
     }
 
     function drawGrid(container, x, y, plotWidth, plotHeight) {
@@ -3381,14 +3374,20 @@
       }
 
       legend.innerHTML = `
-        <div class="filter-header legend-header">
-          <span class="legend-hint filter-hint filter-hint-block">${filterOn ? "Showing selected keys" : "Click a key to filter tracks"}</span>
+        <div class="legend-panel-header">
+          <button type="button" class="legend-panel-toggle" aria-expanded="${state.camelotLegendCollapsed ? "false" : "true"}" aria-controls="legend-body">
+            <span class="legend-panel-chevron" aria-hidden="true"></span>
+            <span class="legend-title filter-header-title">Camelot</span>
+          </button>
           <button type="button" class="bpm-reset camelot-reset" title="Reset key filters" aria-label="Reset Camelot key filters"${filterOn ? "" : " disabled"}>↺</button>
         </div>
-        <svg class="camelot-wheel" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Camelot key wheel">
-          ${svg}
-        </svg>`;
-      syncFilterCollapsibles();
+        <div class="legend-panel-body" id="legend-body">
+          <span class="legend-hint filter-hint">${filterOn ? "Showing selected keys" : "Click a key to filter tracks"}</span>
+          <svg class="camelot-wheel" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Camelot key wheel">
+            ${svg}
+          </svg>
+        </div>`;
+      syncCamelotLegendCollapse();
     }
 
     function resetCamelotFilter() {
@@ -3530,7 +3529,6 @@
       drawSetMoments(viewport, x, y, plotWidth, plotHeight);
       updateMomentsLegend();
       updateCamelotLegend();
-      syncFilterCollapsibles();
 
       drawGrid(viewport, x, y, plotWidth, plotHeight);
 
@@ -3850,26 +3848,12 @@
         });
       });
 
-      document.getElementById("moments-filter-toggle").addEventListener("click", (event) => {
-        event.stopPropagation();
-        state.momentsPanelOpen = !state.momentsPanelOpen;
-        if (state.momentsPanelOpen) state.camelotPanelOpen = false;
-        syncFilterCollapsibles();
-      });
-
-      document.getElementById("camelot-filter-toggle").addEventListener("click", (event) => {
-        event.stopPropagation();
-        state.camelotPanelOpen = !state.camelotPanelOpen;
-        if (state.camelotPanelOpen) state.momentsPanelOpen = false;
-        syncFilterCollapsibles();
-      });
-
-      document.addEventListener("click", (event) => {
-        if (event.target.closest(".filter-collapsible")) return;
-        if (state.momentsPanelOpen || state.camelotPanelOpen) closeFilterCollapsibles();
-      });
-
       document.getElementById("moments-legend").addEventListener("click", (e) => {
+        if (e.target.closest(".legend-panel-toggle")) {
+          state.momentsLegendCollapsed = !state.momentsLegendCollapsed;
+          syncMomentsLegendCollapse();
+          return;
+        }
         if (e.target.closest(".moments-reset")) {
           resetMomentsFilter();
           return;
@@ -3883,6 +3867,11 @@
       });
 
       document.getElementById("legend").addEventListener("click", (e) => {
+        if (e.target.closest(".legend-panel-toggle")) {
+          state.camelotLegendCollapsed = !state.camelotLegendCollapsed;
+          syncCamelotLegendCollapse();
+          return;
+        }
         if (e.target.closest(".camelot-reset")) {
           resetCamelotFilter();
           return;
@@ -3976,7 +3965,6 @@
       });
 
       updateNeighborsButton(null, 0);
-      syncFilterCollapsibles();
 
       document.getElementById("reset-view-btn").addEventListener("click", () => resetView(true));
 
