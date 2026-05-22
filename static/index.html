@@ -52,13 +52,6 @@
       font-size: 12px;
     }
 
-    .analysis-note {
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.4;
-      margin: 0 0 14px;
-    }
-
     .stat-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -421,7 +414,6 @@
     <aside>
       <h1>Track Graph</h1>
       <div class="subtitle">BPM × energy map · estimated mix hints</div>
-      <p class="analysis-note" id="analysis-note" hidden></p>
 
       <div class="stat-grid">
         <div class="stat"><div class="stat-label">Visible</div><div class="stat-value" id="stat-visible">–</div></div>
@@ -930,22 +922,6 @@
       document.getElementById("stat-links").textContent = edges.length;
       document.getElementById("stat-library").textContent = state.data.tracks.filter(t => t.source === "tracks").length;
       document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
-      updateAnalysisNote(tracks);
-    }
-
-    function updateAnalysisNote(tracks) {
-      const el = document.getElementById("analysis-note");
-      const lowBpm = tracks.filter(t => t.bpm_confidence != null && t.bpm_confidence < LOW_BPM_CONFIDENCE).length;
-      if (!lowBpm) {
-        el.hidden = true;
-        el.textContent = "";
-        return;
-      }
-      el.hidden = false;
-      const scope = tracks.length === state.data.tracks.length ? "in library" : "on map";
-      el.textContent = lowBpm === 1
-        ? `1 track ${scope} has low BPM confidence — verify tempo in Rekordbox.`
-        : `${lowBpm} tracks ${scope} have low BPM confidence — verify tempo in Rekordbox.`;
     }
 
     function syncSourceFilterChips() {
