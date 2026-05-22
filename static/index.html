@@ -244,10 +244,32 @@
       pointer-events: none;
     }
 
+    .mix-dock.is-chrome {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .mix-dock.is-chrome:not(.is-visible) {
+      bottom: auto;
+      height: auto;
+      max-height: none;
+      width: max-content;
+      min-width: 0;
+      max-width: 248px;
+      padding: 10px 11px;
+    }
+
+    .mix-dock.is-chrome:not(.is-visible) .neighbor-panel-body,
+    .mix-dock.is-chrome:not(.is-visible) .neighbor-panel-queue-meta {
+      display: none;
+    }
+
     .mix-dock.is-visible {
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
+      width: 248px;
     }
 
     .mix-dock.is-visible.is-collapsed {
@@ -260,9 +282,29 @@
       flex-shrink: 0;
       display: flex;
       align-items: center;
+      gap: 8px;
+      margin-bottom: 0;
+    }
+
+    .mix-dock.is-visible .neighbor-panel-header {
+      margin-bottom: 6px;
+    }
+
+    #neighbors-btn.neighbor-toggle {
+      flex-shrink: 0;
+      padding: 6px 10px;
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .neighbor-panel-queue-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 6px;
     }
 
     .mix-dock.is-collapsed .neighbor-panel-header {
@@ -1543,7 +1585,6 @@
             <button class="chip active" data-layout="mix">Mix map</button>
             <button class="chip" data-layout="explore">Mix links</button>
           </div>
-          <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
           <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
       </div>
@@ -1552,11 +1593,14 @@
     <div class="workspace" id="workspace">
       <div class="mix-dock" id="neighbor-panel" aria-hidden="true">
         <div class="neighbor-panel-header">
-          <button type="button" class="neighbor-panel-toggle" id="neighbor-panel-toggle" aria-expanded="true" aria-controls="neighbor-panel-body">
-            <span class="neighbor-panel-chevron" aria-hidden="true"></span>
-            <span class="neighbor-panel-title">Mix queue</span>
-          </button>
-          <span class="neighbor-panel-count" id="neighbor-panel-count"></span>
+          <button type="button" class="secondary neighbor-toggle" id="neighbors-btn" title="Highlight mix neighbors and open mix queue">Neighbors</button>
+          <div class="neighbor-panel-queue-meta">
+            <button type="button" class="neighbor-panel-toggle" id="neighbor-panel-toggle" aria-expanded="true" aria-controls="neighbor-panel-body">
+              <span class="neighbor-panel-chevron" aria-hidden="true"></span>
+              <span class="neighbor-panel-title">Mix queue</span>
+            </button>
+            <span class="neighbor-panel-count" id="neighbor-panel-count"></span>
+          </div>
         </div>
         <div class="neighbor-panel-body" id="neighbor-panel-body">
           <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
@@ -2126,7 +2170,7 @@
 
     function mixDockWidth() {
       const panel = document.getElementById("neighbor-panel");
-      if (!panel?.classList.contains("is-visible") || panel.classList.contains("is-collapsed")) return 0;
+      if (!panel?.classList.contains("is-chrome") || panel.classList.contains("is-collapsed")) return 0;
       return Math.ceil(panel.getBoundingClientRect().width) + 10;
     }
 
@@ -2960,24 +3004,29 @@
       const emptyEl = document.getElementById("neighbor-empty");
       if (!panel || !list || !countEl || !emptyEl) return;
 
-      const show = state.highlightNeighbors && !!neighborAnchorId();
-      panel.classList.toggle("is-visible", show);
-      panel.setAttribute("aria-hidden", show ? "false" : "true");
-      if (!show) {
+      const anchorId = neighborAnchorId();
+      const showChrome = !!state.selectedId;
+      const showList = state.highlightNeighbors && !!anchorId;
+      panel.classList.toggle("is-chrome", showChrome);
+      panel.classList.toggle("is-visible", showList);
+      panel.setAttribute("aria-hidden", showChrome ? "false" : "true");
+      if (!showList) {
         list.innerHTML = "";
         emptyEl.hidden = true;
         countEl.textContent = "";
+        syncNeighborPanelCollapse();
         return;
       }
 
-      const anchorId = neighborAnchorId();
       const anchor = tracks.find(t => t.id === anchorId)
         || state.data?.tracks.find(t => t.id === anchorId);
       if (!anchor) {
         panel.classList.remove("is-visible");
-        panel.setAttribute("aria-hidden", "true");
+        panel.classList.toggle("is-chrome", !!state.selectedId);
+        panel.setAttribute("aria-hidden", state.selectedId ? "false" : "true");
         list.innerHTML = "";
         countEl.textContent = "";
+        syncNeighborPanelCollapse();
         return;
       }
 
@@ -3081,6 +3130,16 @@
 
     function fitViewToFilteredTracks(animate = true) {
       applyViewTransform(fitViewTransformForTracks(filteredTracks()), animate);
+    }
+
+    function restoreMapView(animate = true) {
+      if (!state.svg || !state.zoomBehavior) return;
+      const tracks = filteredTracks();
+      if (viewFiltersActive() && tracks.length) {
+        fitViewToFilteredTracks(animate);
+      } else {
+        resetView(animate);
+      }
     }
 
     function scheduleFilterViewFit(fn) {
@@ -4036,6 +4095,7 @@
         } else {
           state.neighborQueueAnchor = null;
           syncPlayQueue();
+          setTimeout(() => restoreMapView(true), 300);
         }
         renderGraph();
       });
