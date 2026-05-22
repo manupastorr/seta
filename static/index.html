@@ -135,7 +135,8 @@
       height: 4px;
       border-radius: 999px;
       background: rgba(0, 0, 0, 0.12);
-      pointer-events: none;
+      pointer-events: auto;
+      cursor: pointer;
       z-index: 0;
     }
 
@@ -199,6 +200,40 @@
 
     .bpm-range input[type="range"]#bpm-max {
       z-index: 2;
+    }
+
+    .bpm-range-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 14px 0 6px;
+    }
+
+    .bpm-range-header label {
+      margin: 0;
+    }
+
+    .bpm-reset {
+      flex-shrink: 0;
+      border: none;
+      background: none;
+      color: var(--accent);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .bpm-reset:hover:not(:disabled) {
+      text-decoration: underline;
+    }
+
+    .bpm-reset:disabled {
+      opacity: 0.35;
+      cursor: default;
     }
 
     input[type="search"], select {
@@ -823,9 +858,12 @@
       <label for="genre">Genre / batch</label>
       <select id="genre"><option value="all">All genres</option></select>
 
-      <label>BPM range <span id="bpm-label"></span></label>
+      <div class="bpm-range-header">
+        <label for="bpm-min">BPM range <span id="bpm-label"></span></label>
+        <button type="button" class="bpm-reset" id="bpm-reset" disabled>Reset</button>
+      </div>
       <div class="bpm-range">
-        <div class="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
+        <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
         <input id="bpm-min" type="range" min="70" max="180" value="70" />
         <input id="bpm-max" type="range" min="70" max="180" value="180" />
       </div>
@@ -2083,6 +2121,84 @@
       }
     }
 
+    function updateBpmLabel() {
+      document.getElementById("bpm-label").textContent = `${state.bpmMin}–${state.bpmMax}`;
+      const lo = PLOT.bpmDomain[0];
+      const hi = PLOT.bpmDomain[1];
+      const span = hi - lo || 1;
+      const left = ((state.bpmMin - lo) / span) * 100;
+      const width = ((state.bpmMax - state.bpmMin) / span) * 100;
+      const fill = document.getElementById("bpm-range-fill");
+      fill.style.left = `${left}%`;
+      fill.style.width = `${width}%`;
+    }
+
+    function updateBpmResetButton() {
+      const btn = document.getElementById("bpm-reset");
+      if (!btn) return;
+      btn.disabled = state.bpmMin === PLOT.bpmDomain[0] && state.bpmMax === PLOT.bpmDomain[1];
+    }
+
+    function syncBpmInputs() {
+      const minInput = document.getElementById("bpm-min");
+      const maxInput = document.getElementById("bpm-max");
+      let min = Number(minInput.value);
+      let max = Number(maxInput.value);
+      if (min > max) {
+        if (document.activeElement === minInput) {
+          max = min;
+        } else {
+          min = max;
+        }
+      }
+      state.bpmMin = min;
+      state.bpmMax = max;
+      minInput.value = String(min);
+      maxInput.value = String(max);
+      updateBpmLabel();
+      updateBpmResetButton();
+      renderGraph();
+    }
+
+    function bpmFromTrackClick(clientX) {
+      const track = document.getElementById("bpm-range-track");
+      if (!track) return null;
+      const rect = track.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const lo = PLOT.bpmDomain[0];
+      const hi = PLOT.bpmDomain[1];
+      return Math.round(lo + ratio * (hi - lo));
+    }
+
+    function setBpmFromTrackClick(clientX) {
+      const bpm = bpmFromTrackClick(clientX);
+      if (bpm == null) return;
+      const minInput = document.getElementById("bpm-min");
+      const maxInput = document.getElementById("bpm-max");
+      const distToMin = Math.abs(bpm - state.bpmMin);
+      const distToMax = Math.abs(bpm - state.bpmMax);
+      if (distToMin <= distToMax) {
+        minInput.value = String(Math.min(bpm, state.bpmMax));
+        minInput.focus({ preventScroll: true });
+      } else {
+        maxInput.value = String(Math.max(bpm, state.bpmMin));
+        maxInput.focus({ preventScroll: true });
+      }
+      syncBpmInputs();
+    }
+
+    function resetBpmRange() {
+      const lo = PLOT.bpmDomain[0];
+      const hi = PLOT.bpmDomain[1];
+      document.getElementById("bpm-min").value = String(lo);
+      document.getElementById("bpm-max").value = String(hi);
+      state.bpmMin = lo;
+      state.bpmMax = hi;
+      updateBpmLabel();
+      updateBpmResetButton();
+      renderGraph();
+    }
+
     async function init() {
       syncUiLayout();
       updateCamelotLegend();
@@ -2102,42 +2218,15 @@
         renderGraph();
       });
 
-      function updateBpmLabel() {
-        document.getElementById("bpm-label").textContent = `${state.bpmMin}–${state.bpmMax}`;
-        const lo = Number(document.getElementById("bpm-min").min);
-        const hi = Number(document.getElementById("bpm-min").max);
-        const span = hi - lo || 1;
-        const left = ((state.bpmMin - lo) / span) * 100;
-        const width = ((state.bpmMax - state.bpmMin) / span) * 100;
-        const fill = document.getElementById("bpm-range-fill");
-        fill.style.left = `${left}%`;
-        fill.style.width = `${width}%`;
-      }
-
-      function syncBpmInputs() {
-        const minInput = document.getElementById("bpm-min");
-        const maxInput = document.getElementById("bpm-max");
-        let min = Number(minInput.value);
-        let max = Number(maxInput.value);
-        if (min > max) {
-          if (document.activeElement === minInput) {
-            max = min;
-          } else {
-            min = max;
-          }
-        }
-        state.bpmMin = min;
-        state.bpmMax = max;
-        minInput.value = String(min);
-        maxInput.value = String(max);
-        updateBpmLabel();
-        renderGraph();
-      }
-
       ["bpm-min", "bpm-max"].forEach(id => {
         document.getElementById(id).addEventListener("input", syncBpmInputs);
       });
+      document.getElementById("bpm-range-track").addEventListener("click", (e) => {
+        setBpmFromTrackClick(e.clientX);
+      });
+      document.getElementById("bpm-reset").addEventListener("click", resetBpmRange);
       updateBpmLabel();
+      updateBpmResetButton();
 
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
         chip.addEventListener("click", () => {
