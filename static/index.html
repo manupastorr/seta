@@ -1735,7 +1735,8 @@
       zoomGestureMoved: false,
       hoveredId: null,
       viewFilterSignature: null,
-      autoFitTimer: null
+      autoFitTimer: null,
+      neighborFocusTimer: null
     };
 
     const audio = document.getElementById("audio");
@@ -3181,6 +3182,15 @@
       applyViewTransform(fitViewTransformForTracks(tracks), true);
     }
 
+    function focusNeighborGroup(anchorId = neighborAnchorId()) {
+      if (!state.highlightNeighbors || !anchorId) return;
+      if (state.neighborFocusTimer) clearTimeout(state.neighborFocusTimer);
+      state.neighborFocusTimer = setTimeout(() => {
+        state.neighborFocusTimer = null;
+        focusOnIds(neighborIds(anchorId));
+      }, 300);
+    }
+
     function syncSourceFilterChips() {
       const both = state.sources.has("tracks") && state.sources.has("to_curate");
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
@@ -3433,6 +3443,7 @@
 
     function setNowPlaying(track, autoplay = true) {
       if (state.highlightNeighbors) {
+        const prevAnchor = state.neighborQueueAnchor;
         const anchorId = neighborAnchorId();
         if (anchorId) {
           const { ids } = mixNeighbors(anchorId, filteredTracks());
@@ -3450,6 +3461,7 @@
         state.selectedId = track.id;
         state.neighborQueueAnchor = track.id;
         syncPlayQueue();
+        if (prevAnchor !== track.id) focusNeighborGroup(track.id);
         const idx = PB.resolvePlayIndex(state.playQueue, track.id);
         playTrackAt(idx >= 0 ? idx : 0, autoplay);
         return;
@@ -3814,7 +3826,10 @@
       state.updateHoveredNode = updateHoveredNode;
 
       if (state.highlightNeighbors && neighborAnchorId()) {
-        simulation.on("end", () => focusOnIds(neighborIds(neighborAnchorId())));
+        simulation.on("end.neighborfocus", () => {
+          simulation.on("end.neighborfocus", null);
+          focusOnIds(neighborIds(neighborAnchorId()));
+        });
       }
 
       if (state.prevLayout !== state.layout) {
@@ -4090,9 +4105,12 @@
         if (state.highlightNeighbors) {
           state.neighborQueueAnchor = state.selectedId;
           syncPlayQueue();
-          const ids = neighborIds(state.selectedId);
-          setTimeout(() => focusOnIds(ids), 300);
+          focusNeighborGroup(state.selectedId);
         } else {
+          if (state.neighborFocusTimer) {
+            clearTimeout(state.neighborFocusTimer);
+            state.neighborFocusTimer = null;
+          }
           state.neighborQueueAnchor = null;
           syncPlayQueue();
           setTimeout(() => restoreMapView(true), 300);
