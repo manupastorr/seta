@@ -1895,8 +1895,8 @@
       floor: 0.15,
       minSpan: 0.4,
       percentileLo: 3,
-      percentileHi: 97,
       padRatio: 0.08,
+      top: 1,
       fallback: [0.2, 1]
     };
 
@@ -2633,22 +2633,17 @@
       if (energies.length < 2) return ENERGY_DISPLAY.fallback.slice();
 
       const sorted = [...energies].sort((a, b) => a - b);
+      const hi = ENERGY_DISPLAY.top;
+      const pHi = energyPercentile(sorted, 97);
       let lo = energyPercentile(sorted, ENERGY_DISPLAY.percentileLo);
-      let hi = energyPercentile(sorted, ENERGY_DISPLAY.percentileHi);
-      const pad = Math.max(0.02, (hi - lo) * ENERGY_DISPLAY.padRatio);
+      const pad = Math.max(0.02, (pHi - lo) * ENERGY_DISPLAY.padRatio);
       lo = Math.max(ENERGY_DISPLAY.floor, lo - pad);
-      hi = Math.min(1, hi + pad);
 
       if (hi - lo < ENERGY_DISPLAY.minSpan) {
-        const mid = (hi + lo) / 2;
-        lo = Math.max(ENERGY_DISPLAY.floor, mid - ENERGY_DISPLAY.minSpan / 2);
-        hi = Math.min(1, mid + ENERGY_DISPLAY.minSpan / 2);
+        lo = Math.max(ENERGY_DISPLAY.floor, hi - ENERGY_DISPLAY.minSpan);
       }
 
-      return [
-        Math.round(lo * 1000) / 1000,
-        Math.round(hi * 1000) / 1000
-      ];
+      return [Math.round(lo * 1000) / 1000, hi];
     }
 
     function energyDisplayDomain() {
@@ -2658,7 +2653,7 @@
     function energyAxisTicks(domain = energyDisplayDomain()) {
       const [lo, hi] = domain;
       const mid = (lo + hi) / 2;
-      return [...new Set([lo, mid, hi].map(v => Math.round(v * 100) / 100))].sort((a, b) => a - b);
+      return [...new Set([lo, mid, hi, ENERGY_DISPLAY.top].map(v => Math.round(v * 100) / 100))].sort((a, b) => a - b);
     }
 
     function energyScale(plotHeight) {
