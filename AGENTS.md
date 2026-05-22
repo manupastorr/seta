@@ -73,7 +73,7 @@ UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confiden
 
 Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars, full-file analysis at scan).
 
-Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a library-wide adaptive floor (p3 of scanned energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. Set-zone filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
+Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a library-wide adaptive floor (p3 of scanned energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. The axis label shows the active range (e.g. `Intensity 0.52–1.0 →`). Set zones that sit below the visible band are dimmed on the map and marked with **↓** in the legend. Set-zone filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
 
 ## UI conventions
 
@@ -83,8 +83,9 @@ Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.js
 - Player uses a Serato-style RGB canvas waveform (red bass / green mids / blue highs); peaks come from `library.json` when present (scan-time, 400 bars); otherwise one `fetch` + client decode. Playback uses the same fetch (blob URL), cached in memory (24 tracks)
 - `./start.sh --quick` runs `scan_library.py --skip-edges` for faster rescans when only adding tracks
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
-- Changing filters (set zones, Camelot, genre, BPM range, search, library source) auto-zooms to the visible filtered nodes; clearing all filters resets the map view
-- Set-zone clouds are fixed BPM×energy regions (visual only); legend order follows set flow: **Open / low** → **Floor** → **Late** → **Wind-down** (Closing last)
+- Changing filters (set zones, Camelot, genre, BPM range, search, library source) auto-zooms to the visible filtered nodes; clearing all filters resets the map view. Active filters show in a header summary chip; filter state persists in `sessionStorage` for the tab session
+- Set-zone clouds are fixed BPM×energy regions (visual only); legend order follows set flow: **Open / low** → **Floor** → **Late** → **Wind-down** (Closing last). Title: **Set zones**
+- Track tooltip and player badges link to Soundeo search (`Artist Title`, `availableFilter=1`) when artist/title are known
 - Keep changes minimal; no new dependencies without good reason
 
 ## Git
