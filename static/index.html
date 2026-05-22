@@ -1816,7 +1816,7 @@
           <div class="time-row">
             <span id="time-current">0:00</span>
             <span id="time-total">0:00</span>
-            <span class="player-shortcuts-hint"><kbd>?</kbd> shortcuts</span>
+            <span class="player-shortcuts-hint"><kbd>?</kbd> shortcuts · <kbd>/</kbd> search</span>
           </div>
         </div>
       </div>
@@ -2854,7 +2854,7 @@
           row.className = "moment-legend-item";
           row.classList.toggle("active", state.activeMoments.has(moment.id));
           row.dataset.momentId = moment.id;
-          row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label">${moment.label}</span>`;
+          row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label${momentBelowDisplayView(moment) ? " below-view" : ""}">${moment.label}</span>`;
           grid.appendChild(row);
         });
       });
