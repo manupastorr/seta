@@ -314,7 +314,7 @@
     #view-controls {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 5px;
+      gap: 7px;
     }
 
     #view-controls #moments-toggle {
@@ -325,6 +325,9 @@
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--panel-border);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
     .sidebar-hint {
@@ -339,19 +342,18 @@
     }
 
     .sidebar-hint-layout {
-      margin-top: 6px;
-      margin-bottom: 2px;
+      margin: 0;
     }
 
     .sidebar-section-map label {
-      margin-top: 0;
+      margin: 0;
     }
 
     .map-actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 0;
     }
 
     .map-actions button {
