@@ -79,7 +79,7 @@ Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.js
 
 - Single frontend file: `static/index.html` (D3, no build step)
 - Bottom **player dock** (full-width, SoundCloud-style): transport, title/artist, badges, wide waveform; left **mix dock** holds the Neighbors toggle and mix queue (filters stay in the top bar)
-- **Keyboard shortcuts** (`?` opens help): Space play/pause, ←/→ prev/next track, Shift+←/→ seek, `⌘K`/`Ctrl+K` or `/` search, `n` neighbors, `r` reset view, ↑/↓ mix queue when neighbors on, Esc peels filters/search/neighbors/view
+- **Keyboard shortcuts** (`?` opens help): Space play/pause, ←/→ prev/next track, Shift+←/→ seek, `/` search, `n` neighbors, `r` reset view, ↑/↓ mix queue when neighbors on, Esc peels filters/search/neighbors/view
 - Player uses a Serato-style RGB canvas waveform (red bass / green mids / blue highs); peaks come from `library.json` when present (scan-time, 400 bars); otherwise one `fetch` + client decode. Playback uses the same fetch (blob URL), cached in memory (24 tracks)
 - `./start.sh --quick` runs `scan_library.py --skip-edges` for faster rescans when only adding tracks
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes

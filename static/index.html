@@ -1853,8 +1853,7 @@
       {
         title: "Search",
         rows: [
-          { keys: "⌘K / Ctrl+K", desc: "Focus search" },
-          { keys: "/", desc: "Focus search (alternate)" },
+          { keys: "/", desc: "Focus search" },
           { keys: "↑ ↓ Enter", desc: "Browse results, play selection" },
           { keys: "Esc", desc: "Close results / clear search" },
         ],
@@ -3978,14 +3977,7 @@
 
       if (isTypingTarget(event.target)) return;
 
-      const cmdOrCtrl = event.metaKey || event.ctrlKey;
-      if ((event.key === "k" || event.key === "K") && cmdOrCtrl && !event.altKey) {
-        event.preventDefault();
-        focusSearchField();
-        return;
-      }
-
-      if (event.key === "/" && !cmdOrCtrl) {
+      if (event.key === "/" && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         focusSearchField();
         return;
