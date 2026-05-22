@@ -225,6 +225,35 @@
       white-space: nowrap;
     }
 
+    .filter-summary {
+      flex: 1 1 100%;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      margin-top: 2px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .filter-summary.is-visible {
+      display: flex;
+    }
+
+    .filter-summary-label {
+      flex-shrink: 0;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .filter-summary-text {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .workspace {
       grid-row: 1;
       grid-column: 1;
@@ -1761,6 +1790,11 @@
           </div>
           <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
+
+        <div class="filter-summary" id="filter-summary" hidden>
+          <span class="filter-summary-label">Active</span>
+          <span class="filter-summary-text" id="filter-summary-text"></span>
+        </div>
       </div>
     </header>
 
@@ -3175,6 +3209,34 @@
         return;
       }
       tryPlaySingleSearchResult();
+    }
+
+    function syncFilterSummary() {
+      const wrap = document.getElementById("filter-summary");
+      const textEl = document.getElementById("filter-summary-text");
+      if (!wrap || !textEl) return;
+
+      const parts = [];
+      if (state.search.trim()) parts.push(`"${state.search.trim()}"`);
+      if (state.activeMoments.size) {
+        parts.push([...state.activeMoments]
+          .map(id => SET_MOMENTS.find(m => m.id === id)?.label)
+          .filter(Boolean)
+          .join(", "));
+      }
+      if (state.activeKeys.size) parts.push([...state.activeKeys].sort().join(", "));
+      if (state.genre !== "all") parts.push(state.genre);
+      if (state.bpmMin > PLOT.bpmDomain[0] || state.bpmMax < PLOT.bpmDomain[1]) {
+        parts.push(`${state.bpmMin}–${state.bpmMax} BPM`);
+      }
+      if (state.sources.size === 1) {
+        parts.push(state.sources.has("tracks") ? "Library" : "Curate");
+      }
+
+      const summary = parts.join(" · ");
+      textEl.textContent = summary;
+      wrap.hidden = !summary;
+      wrap.classList.toggle("is-visible", !!summary);
     }
 
     function filteredTracks() {
