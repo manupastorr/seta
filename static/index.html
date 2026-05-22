@@ -534,7 +534,7 @@
 
       <div class="stat-grid">
         <div class="stat"><div class="stat-label">Visible</div><div class="stat-value" id="stat-visible">–</div></div>
-        <div class="stat"><div class="stat-label">Links</div><div class="stat-value" id="stat-links">–</div></div>
+        <div class="stat"><div class="stat-label" id="stat-links-label">Mix pairs</div><div class="stat-value" id="stat-links">–</div></div>
         <div class="stat"><div class="stat-label">Library</div><div class="stat-value" id="stat-library">–</div></div>
         <div class="stat"><div class="stat-label">Curate</div><div class="stat-value" id="stat-curate">–</div></div>
       </div>
@@ -615,6 +615,7 @@
     };
 
     const LOW_BPM_CONFIDENCE = 0.45;
+    const MIX_MIN_SCORE = 0.55;
 
     const PLOT = {
       margin: { top: 44, right: 36, bottom: 52, left: 52 },
@@ -1015,7 +1016,7 @@
       const selected = tracks.find(t => t.id === trackId);
       if (!selected) return { ids: new Set([trackId]), list: [] };
 
-      const list = tracks.filter(t => t.id !== trackId && mixScore(selected, t) >= 0.45);
+      const list = tracks.filter(t => t.id !== trackId && mixScore(selected, t) >= MIX_MIN_SCORE);
       list.sort((a, b) => mixScore(selected, b) - mixScore(selected, a));
       const ids = new Set([trackId, ...list.map(t => t.id)]);
       return { ids, list };
@@ -1067,9 +1068,22 @@
       state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
     }
 
+    function updateLinkStat(tracks, edges = visibleEdgeSet(tracks)) {
+      const linksLabel = document.getElementById("stat-links-label");
+      const linksValue = document.getElementById("stat-links");
+      if (state.highlightNeighbors && state.selectedId) {
+        const { list } = mixNeighbors(state.selectedId, tracks);
+        linksLabel.textContent = "Neighbors";
+        linksValue.textContent = list.length;
+        return;
+      }
+      linksLabel.textContent = "Mix pairs";
+      linksValue.textContent = edges.length;
+    }
+
     function updateStats(tracks, edges) {
       document.getElementById("stat-visible").textContent = tracks.length;
-      document.getElementById("stat-links").textContent = edges.length;
+      updateLinkStat(tracks, edges);
       document.getElementById("stat-library").textContent = state.data.tracks.filter(t => t.source === "tracks").length;
       document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
     }
@@ -1364,6 +1378,7 @@
       });
 
       const linkData = linkForceData(edges);
+      const showGlobalLinks = state.layout === "explore";
       const simulation = d3.forceSimulation(tracks)
         .alphaDecay(0.025)
         .force("link", d3.forceLink(linkData).id(d => d.id).distance(d => 90 - d.score * 40).strength(d => state.layout === "explore" ? d.score * 0.35 : 0))
@@ -1380,9 +1395,12 @@
           .force("y", d3.forceY(d => trackPosition(d, x, y, true, plotWidth, plotHeight).y).strength(0.12));
       }
 
-      const link = viewport.append("g").attr("class", "links").selectAll("line").data(linkData).join("line")
-        .attr("class", "link")
-        .style("pointer-events", "none");
+      let link = null;
+      if (showGlobalLinks) {
+        link = viewport.append("g").attr("class", "links").selectAll("line").data(linkData).join("line")
+          .attr("class", "link")
+          .style("pointer-events", "none");
+      }
 
       const mixLinks = viewport.append("g").attr("class", "mix-links");
 
@@ -1446,11 +1464,11 @@
         node.classed("playing", d => d.id === state.playingId);
         node.classed("neighbor", d => neighbors && neighbors.has(d.id) && d.id !== active);
         node.classed("dim", d => neighbors && !neighbors.has(d.id));
-        link.classed("highlight", e => {
-          if (!active || !state.highlightNeighbors || !neighbors) return false;
-          return neighbors.has(e.source.id) && neighbors.has(e.target.id);
-        });
+        if (link) {
+          link.style("opacity", state.highlightNeighbors ? 0 : 1);
+        }
         updateMixLinks();
+        updateLinkStat(tracks, edges);
         updateNeighborsButton(active, neighbors ? neighbors.size : 0);
 
         if (active && state.highlightNeighbors) {
@@ -1481,11 +1499,13 @@
       });
 
       simulation.on("tick", () => {
-        link
-          .attr("x1", d => d.source.x)
-          .attr("y1", d => d.source.y)
-          .attr("x2", d => d.target.x)
-          .attr("y2", d => d.target.y);
+        if (link) {
+          link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+        }
         node.attr("transform", d => `translate(${d.x},${d.y})`);
         if (state.highlightNeighbors) updateMixLinks();
       });
