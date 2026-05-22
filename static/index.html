@@ -2657,6 +2657,12 @@
       return [...new Set([lo, mid, hi, ENERGY_DISPLAY.top].map(v => Math.round(v * 100) / 100))].sort((a, b) => a - b);
     }
 
+    function formatEnergyRangeLabel() {
+      const [lo, hi] = energyDisplayDomain();
+      if (lo <= 0.001 && hi >= 0.999) return "Intensity (est.) →";
+      return `Intensity ${lo.toFixed(2)}–${hi.toFixed(1)} →`;
+    }
+
     function energyScale(plotHeight) {
       const domain = energyDisplayDomain();
       return d3.scaleLinear()
