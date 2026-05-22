@@ -1,6 +1,6 @@
 # Track Graph
 
-Local web app to browse a DJ library on a **BPM × energy** map, with **Camelot** mix links, playback, and set-moment overlays.
+Local web app to browse a DJ library on a **BPM × energy** map, with **Camelot** mix hints, playback, and set-moment overlays. BPM, energy, and key come from local analysis (~90s sample per file)—useful for exploration, not a substitute for Rekordbox when confidence is low.
 
 Default scan folders (override with `.env`):
 
@@ -15,9 +15,9 @@ cd track-graph
 ./start.sh
 ```
 
-Opens **http://127.0.0.1:8765** after scanning (cached analysis is reused when files unchanged).
+`./start.sh` scans then starts the server. Open the URL printed in the terminal (default **http://127.0.0.1:8765**). Cached analysis is reused when files are unchanged.
 
-First run creates a local `.venv` in the project folder.
+First run creates a local `.venv` and installs dependencies from `requirements.txt`.
 
 ## Share with someone else (separate Mac, own tracks)
 
@@ -87,7 +87,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 |-------|------|
 | `config.py` | Paths and port from env / `.env` |
 | `scan_library.py` | Walks audio folders, analyzes tracks, writes `library.json` + mix edges |
-| `analyze.py` | BPM, Camelot key, energy (librosa, ~90s sample) |
+| `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy estimates (librosa, ~90s sample) |
 | `camelot.py` | Wheel colors + mix compatibility scoring |
 | `server.py` | Flask: UI, `/api/library`, audio streaming |
 | `static/index.html` | Single-page D3 graph + player |
@@ -105,6 +105,14 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 - `.env` — local path overrides
 
 Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze.py`).
+
+## Tests
+
+From the project folder (after `.venv` exists):
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
 
 ## Scanner exclusions
 

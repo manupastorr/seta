@@ -11,7 +11,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-from analyze import ANALYSIS_VERSION, analyze_track
 from camelot import mix_score
 from config import curate_root, tracks_root
 
@@ -101,6 +100,8 @@ def save_cache(cache: dict) -> None:
 
 
 def analyze_if_needed(path: Path, cache: dict) -> dict:
+    from analyze import ANALYSIS_VERSION, analyze_track
+
     key = str(path.resolve())
     sig = file_sig(path)
     cached = cache.get(key)
@@ -119,6 +120,8 @@ def analyze_if_needed(path: Path, cache: dict) -> dict:
 
 
 def _analyze_worker(path_str: str) -> tuple[str, dict, dict]:
+    from analyze import analyze_track
+
     path = Path(path_str)
     sig = file_sig(path)
     result = analyze_track(path)

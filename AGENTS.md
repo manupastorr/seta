@@ -30,12 +30,26 @@ Copy `.env.example` → `.env` per machine. Do not commit `.env`.
 ## Run / develop
 
 ```bash
-./start.sh                    # scan + serve on :8765
+./start.sh                    # scan + serve; open printed URL (default :8765)
 .venv/bin/python scan_library.py
 .venv/bin/python server.py
 ```
 
+`start.sh` creates `.venv` on first run, installs `requirements.txt`, sources `.env` if present, then scans and execs `server.py` (it does not auto-open a browser).
+
 After changing `analyze.py`, bump `ANALYSIS_VERSION` so the cache re-analyzes stale entries.
+
+## Tests
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+Covers scanner path rules, Camelot/mix scoring, and optional sanity check against a local `library.json` if present.
+
+## Analysis vs Rekordbox
+
+BPM, energy, and Camelot key are **local analysis aids** for map placement and mix hints—not Rekordbox truth. Energy and key have no separate confidence field; BPM exposes `bpm_confidence`. When `bpm_confidence` is low (UI/tooltip threshold **0.45**), verify tempo in Rekordbox before trusting grid position or mix links.
 
 ## Scanner rules
 
