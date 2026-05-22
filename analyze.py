@@ -12,7 +12,7 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 9
+ANALYSIS_VERSION = 10
 WAVEFORM_BARS = 400
 WAVEFORM_VERSION = 1
 BPM_MIN = 70.0
@@ -549,12 +549,8 @@ def analyze_track(path: Path) -> dict:
             "analysis_error": str(exc),
         }
 
-    y_full, sr_full = _load_mono(path, max_seconds=None)
-    y = y_full[: int(ANALYSIS_SECONDS * sr_full)] if len(y_full) > ANALYSIS_SECONDS * sr_full else y_full
-    sr = sr_full
-
     vocals, vocals_confidence = _detect_vocals(y, sr)
-    waveform = _compute_waveform_peaks(y_full, sr_full)
+    waveform = _compute_waveform_peaks(y, sr)
     bpm, bpm_raw, bpm_octave_corrected, onset_env, tempo_candidates = _detect_bpm(y, sr)
     bpm_source = "analysis"
 
