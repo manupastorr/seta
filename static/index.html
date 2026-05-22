@@ -171,16 +171,21 @@
       flex: 1 1 170px;
       max-width: 250px;
       min-width: 150px;
+      align-items: center;
+      gap: 4px;
     }
 
     .filter-group-bpm .bpm-range-block {
       flex: 1;
       min-width: 72px;
+      padding: 0 8px;
+      box-sizing: border-box;
     }
 
     .filter-group-bpm .bpm-range {
       height: 24px;
       margin: 0;
+      overflow: visible;
     }
 
     .filter-group-bpm .bpm-range-ends {
@@ -195,7 +200,13 @@
     }
 
     .filter-group-bpm .bpm-reset {
-      flex-shrink: 0;
+      flex: 0 0 22px;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .filter-group-map {
@@ -681,6 +692,7 @@
       color: var(--muted);
       margin: -4px 0 6px;
       line-height: 1.3;
+      min-height: 2.6em;
     }
 
     .filter-hint-block {
@@ -698,16 +710,22 @@
     }
 
     .bpm-reset {
-      flex-shrink: 0;
+      flex: 0 0 22px;
+      width: 22px;
+      height: 22px;
+      box-sizing: border-box;
       border: none;
       background: none;
       color: var(--accent);
       font: inherit;
       font-size: 13px;
       line-height: 1;
-      padding: 2px 4px;
+      padding: 0;
       border-radius: 6px;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .bpm-reset:hover:not(:disabled) {
@@ -717,6 +735,11 @@
     .bpm-reset:disabled {
       opacity: 0.35;
       cursor: default;
+      pointer-events: none;
+    }
+
+    .legend-panel-header .bpm-reset {
+      flex: 0 0 22px;
     }
 
     input[type="search"], select {
@@ -1227,7 +1250,7 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 8px;
-      min-height: 20px;
+      min-height: 22px;
     }
 
     .legend.is-collapsed .legend-panel-header,
@@ -1868,6 +1891,15 @@
       energyDomain: [0, 1]
     };
 
+    const ENERGY_DISPLAY = {
+      floor: 0.15,
+      minSpan: 0.4,
+      percentileLo: 3,
+      percentileHi: 97,
+      padRatio: 0.08,
+      fallback: [0.2, 1]
+    };
+
     // Fixed BPM × energy regions — visual guide only, not per-track labels.
     const SET_MOMENTS = [
       { id: "close-eyes", label: "Close eyes", bpm: [70, 98], energy: [0.05, 0.42], color: "#7986CB" },
@@ -1932,7 +1964,8 @@
       autoFitTimer: null,
       neighborFocusTimer: null,
       shortcutsOpen: false,
-      queueFocusIndex: -1
+      queueFocusIndex: -1,
+      energyDisplayDomain: null
     };
 
     const audio = document.getElementById("audio");
@@ -2589,9 +2622,49 @@
         .range([PLOT.inset.left, plotWidth - PLOT.inset.right]);
     }
 
+    function energyPercentile(sorted, p) {
+      if (!sorted.length) return 0.5;
+      const i = Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))));
+      return sorted[i];
+    }
+
+    function computeEnergyDisplayDomain(tracks) {
+      const energies = tracks.map(t => t.energy).filter(e => e != null && Number.isFinite(e));
+      if (energies.length < 2) return ENERGY_DISPLAY.fallback.slice();
+
+      const sorted = [...energies].sort((a, b) => a - b);
+      let lo = energyPercentile(sorted, ENERGY_DISPLAY.percentileLo);
+      let hi = energyPercentile(sorted, ENERGY_DISPLAY.percentileHi);
+      const pad = Math.max(0.02, (hi - lo) * ENERGY_DISPLAY.padRatio);
+      lo = Math.max(ENERGY_DISPLAY.floor, lo - pad);
+      hi = Math.min(1, hi + pad);
+
+      if (hi - lo < ENERGY_DISPLAY.minSpan) {
+        const mid = (hi + lo) / 2;
+        lo = Math.max(ENERGY_DISPLAY.floor, mid - ENERGY_DISPLAY.minSpan / 2);
+        hi = Math.min(1, mid + ENERGY_DISPLAY.minSpan / 2);
+      }
+
+      return [
+        Math.round(lo * 1000) / 1000,
+        Math.round(hi * 1000) / 1000
+      ];
+    }
+
+    function energyDisplayDomain() {
+      return state.energyDisplayDomain || PLOT.energyDomain;
+    }
+
+    function energyAxisTicks(domain = energyDisplayDomain()) {
+      const [lo, hi] = domain;
+      const mid = (lo + hi) / 2;
+      return [...new Set([lo, mid, hi].map(v => Math.round(v * 100) / 100))].sort((a, b) => a - b);
+    }
+
     function energyScale(plotHeight) {
+      const domain = energyDisplayDomain();
       return d3.scaleLinear()
-        .domain(PLOT.energyDomain)
+        .domain(domain)
         .range([plotHeight - PLOT.inset.bottom, PLOT.inset.top]);
     }
 
@@ -2796,7 +2869,7 @@
           .attr("y1", 0).attr("y2", plotHeight);
       }
 
-      for (let e = 0; e <= 1.001; e += 0.5) {
+      for (const e of energyAxisTicks()) {
         const py = y(e);
         grid.append("line")
           .attr("class", "grid-line major")
@@ -2817,7 +2890,7 @@
       const maxY = PLOT.margin.top + plotHeight + 8;
       const maxBpmY = height - playerDockHeight() - 8;
       const bpmTicks = d3.range(PLOT.bpmDomain[0], PLOT.bpmDomain[1] + 1, 20);
-      const energyTicks = [0, 0.5, 1];
+      const energyTicks = energyAxisTicks();
       const intensityX = plotLeft - 12;
 
       const bpmLayer = state.axisTickLayer.selectAll(".bpm-ticks").data([null]).join("g").attr("class", "bpm-ticks");
@@ -3484,7 +3557,7 @@
       return `
         <span class="tt-badge bpm">${bpmVal != null ? bpmVal : "?"} BPM</span>
         <span class="tt-badge key" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
-        <span class="tt-badge energy" title="Estimated intensity (0–1)">Int ${energy}</span>
+        <span class="tt-badge energy" title="Estimated intensity (0–1, map Y uses library range)">Int ${energy}</span>
         ${vocalsBadgeHtml(track)}
       `;
     }
@@ -4422,6 +4495,7 @@
       bindGraphInteraction();
       const res = await fetch("/api/library");
       state.data = await res.json();
+      state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
       populateGenres(state.data.tracks);
       renderGraph();
 

@@ -73,7 +73,7 @@ UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confiden
 
 Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars, full-file analysis at scan).
 
-Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
+Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** uses a library-wide display range (p3–p97 of scanned energies, padded, min span 0.4) so typical club libraries are not crushed at the top. Set-moment filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
 
 ## UI conventions
 
