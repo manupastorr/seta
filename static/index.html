@@ -206,8 +206,17 @@
       overflow: visible;
     }
 
-    #graph.is-panning {
+    #graph.is-over-node {
+      cursor: pointer;
+    }
+
+    #graph.is-panning,
+    #graph.is-panning .zoom-surface {
       cursor: grabbing;
+    }
+
+    #graph .zoom-surface {
+      cursor: grab;
     }
 
     .axis-label {
@@ -248,11 +257,46 @@
       pointer-events: none;
     }
 
-    .node circle.core {
+    .node circle.hit {
+      fill: transparent;
+      stroke: none;
       pointer-events: all;
-      stroke-width: 0.75px;
       cursor: pointer;
+    }
+
+    .node circle.core {
+      pointer-events: none;
+      stroke-width: 0.75px;
       vector-effect: non-scaling-stroke;
+    }
+
+    #graph-loupe {
+      position: fixed;
+      width: 140px;
+      height: 140px;
+      margin-left: -70px;
+      margin-top: -70px;
+      pointer-events: none;
+      z-index: 5;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.95), 0 8px 24px rgba(0, 0, 0, 0.14);
+      background: rgba(255, 255, 255, 0.98);
+    }
+
+    #graph-loupe svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #graph-loupe .loupe-reticle {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1px;
+      vector-effect: non-scaling-stroke;
+      opacity: 0.55;
     }
 
     .link {
@@ -598,6 +642,9 @@
       <div class="legend" id="legend"></div>
       <div class="moments-legend" id="moments-legend" hidden></div>
       <div class="tooltip" id="tooltip"></div>
+      <div id="graph-loupe" hidden aria-hidden="true">
+        <svg id="loupe-svg" width="140" height="140" viewBox="0 0 140 140"></svg>
+      </div>
       <svg id="graph"></svg>
     </main>
   </div>
@@ -616,6 +663,7 @@
 
     const LOW_BPM_CONFIDENCE = 0.45;
     const MIX_MIN_SCORE = 0.55;
+    const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, pickRadius: 20, hitRadius: 12, hideWhenHitPx: 22 };
 
     const PLOT = {
       margin: { top: 44, right: 36, bottom: 52, left: 52 },
@@ -660,7 +708,9 @@
       axisLayer: null,
       svg: null,
       plotWidth: 0,
-      plotHeight: 0
+      plotHeight: 0,
+      renderedTracks: [],
+      loupePointer: null
     };
 
     const audio = document.getElementById("audio");
@@ -696,6 +746,98 @@
         `A ${rInner} ${rInner} 0 0 0 ${x4.toFixed(2)} ${y4.toFixed(2)}`,
         "Z"
       ].join(" ");
+    }
+
+    function nodeVisualRadius(track) {
+      return 3 + (track.duration_sec ? Math.min(track.duration_sec / 180, 1) : 0);
+    }
+
+    function pickNearestTrack(px, py, tracks, maxDist) {
+      let best = null;
+      let bestDist = maxDist;
+      for (const track of tracks) {
+        if (track.x == null || track.y == null) continue;
+        const dist = Math.hypot(track.x - px, track.y - py);
+        if (dist <= bestDist) {
+          bestDist = dist;
+          best = track;
+        }
+      }
+      return best;
+    }
+
+    function shouldShowLoupe() {
+      return state.zoomTransform.k * LOUPE.hitRadius < LOUPE.hideWhenHitPx;
+    }
+
+    function hideLoupe() {
+      document.getElementById("graph-loupe").hidden = true;
+      state.loupePointer = null;
+    }
+
+    function renderLoupe(viewportX, viewportY, tracks) {
+      const center = LOUPE.size / 2;
+      const scale = LOUPE.scale;
+      const svg = d3.select("#loupe-svg");
+      const nearby = tracks.filter(track => {
+        if (track.x == null || track.y == null) return false;
+        return Math.hypot(track.x - viewportX, track.y - viewportY) <= LOUPE.sourceRadius;
+      });
+
+      svg.selectAll("circle.loupe-node")
+        .data(nearby, d => d.id)
+        .join("circle")
+        .attr("class", "loupe-node")
+        .attr("cx", d => center + (d.x - viewportX) * scale)
+        .attr("cy", d => center + (d.y - viewportY) * scale)
+        .attr("r", d => nodeVisualRadius(d) * scale)
+        .attr("fill", d => camelotColor(d.key))
+        .attr("stroke", "rgba(0,0,0,0.14)")
+        .attr("stroke-width", 0.75);
+
+      svg.selectAll("circle.loupe-reticle")
+        .data([0])
+        .join("circle")
+        .attr("class", "loupe-reticle")
+        .attr("cx", center)
+        .attr("cy", center)
+        .attr("r", 4);
+    }
+
+    function bindLoupeHandlers() {
+      const svg = d3.select("#graph");
+
+      svg.on("mousemove.loupe", (event) => {
+        if (!state.viewport || svg.classed("is-panning") || !shouldShowLoupe()) {
+          hideLoupe();
+          return;
+        }
+        const [px, py] = d3.pointer(event, state.viewport.node());
+        const { plotWidth, plotHeight } = plotSize();
+        if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) {
+          hideLoupe();
+          return;
+        }
+        const loupeEl = document.getElementById("graph-loupe");
+        loupeEl.hidden = false;
+        loupeEl.style.left = `${event.clientX}px`;
+        loupeEl.style.top = `${event.clientY}px`;
+        state.loupePointer = { x: px, y: py };
+        renderLoupe(px, py, state.renderedTracks);
+      });
+
+      svg.on("mouseleave.loupe", () => {
+        hideLoupe();
+        svg.classed("is-over-node", false);
+      });
+
+      svg.on("click.pick", (event) => {
+        if (event.target.closest?.("circle.hit")) return;
+        if (!state.viewport) return;
+        const [px, py] = d3.pointer(event, state.viewport.node());
+        const track = pickNearestTrack(px, py, state.renderedTracks, LOUPE.pickRadius);
+        if (track) setNowPlaying(track);
+      });
     }
 
     function plotSize() {
@@ -1290,7 +1432,7 @@
         return event.type === "mousedown" && event.button === 0;
       }
       const target = event.target;
-      if (target.closest && target.closest("circle.core")) return false;
+      if (target.closest && (target.closest("circle.core") || target.closest("circle.hit"))) return false;
       return event.type === "mousedown" && event.button === 0;
     }
 
@@ -1307,6 +1449,7 @@
           const next = clampTransform(event.transform, plotWidth, plotHeight, state.layout);
           state.zoomTransform = next;
           viewport.attr("transform", next);
+          if (!shouldShowLoupe()) hideLoupe();
         });
       svg.call(state.zoomBehavior);
       svg.call(state.zoomBehavior.transform, state.zoomTransform);
@@ -1317,6 +1460,8 @@
       const edges = visibleEdgeSet(tracks);
       updateStats(tracks, edges);
       rebuildPlayQueue(state.playingId || state.selectedId);
+
+      d3.select("#graph").classed("is-over-node", false);
 
       const { width, height, plotWidth, plotHeight } = plotSize();
       state.plotWidth = plotWidth;
@@ -1360,7 +1505,7 @@
         .attr("width", plotWidth)
         .attr("height", plotHeight)
         .attr("fill", "transparent")
-        .style("pointer-events", "none");
+        .style("pointer-events", "all");
 
       if (state.showMoments) {
         drawSetMoments(viewport, x, y, plotWidth, plotHeight);
@@ -1451,9 +1596,13 @@
         .call(drag);
 
       node.append("circle")
+        .attr("class", "hit")
+        .attr("r", LOUPE.hitRadius);
+
+      node.append("circle")
         .attr("class", "core")
         .attr("vector-effect", "non-scaling-stroke")
-        .attr("r", d => 3 + (d.duration_sec ? Math.min(d.duration_sec / 180, 1) : 0))
+        .attr("r", d => nodeVisualRadius(d))
         .attr("fill", d => camelotColor(d.key))
         .attr("stroke", "rgba(0,0,0,0.12)");
 
@@ -1486,6 +1635,12 @@
         }
       }
 
+      node.on("mouseenter.cursor", () => {
+        svg.classed("is-over-node", true);
+      }).on("mouseleave.cursor", () => {
+        svg.classed("is-over-node", false);
+      });
+
       node.on("mouseenter", (event, d) => {
         tooltip.style.opacity = 1;
         positionTooltip(event);
@@ -1494,9 +1649,12 @@
         positionTooltip(event);
       }).on("mouseleave", () => {
         tooltip.style.opacity = 0;
-      }).on("click", (_, d) => {
+      }).on("click", (event, d) => {
+        event.stopPropagation();
         setNowPlaying(d);
       });
+
+      state.renderedTracks = tracks;
 
       simulation.on("tick", () => {
         if (link) {
@@ -1508,6 +1666,9 @@
         }
         node.attr("transform", d => `translate(${d.x},${d.y})`);
         if (state.highlightNeighbors) updateMixLinks();
+        if (state.loupePointer && shouldShowLoupe()) {
+          renderLoupe(state.loupePointer.x, state.loupePointer.y, tracks);
+        }
       });
 
       refreshHighlight();
@@ -1543,6 +1704,7 @@
 
     async function init() {
       buildLegend();
+      bindLoupeHandlers();
       const res = await fetch("/api/library");
       state.data = await res.json();
       populateGenres(state.data.tracks);
