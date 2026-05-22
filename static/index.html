@@ -338,6 +338,11 @@
       margin-top: 6px;
     }
 
+    .sidebar-hint-layout {
+      margin-top: 6px;
+      margin-bottom: 2px;
+    }
+
     .sidebar-section-map label {
       margin-top: 0;
     }
@@ -965,9 +970,10 @@
         <label>Map</label>
         <div class="chip-row" id="view-controls">
           <button class="chip active" data-layout="mix">Mix map</button>
-          <button class="chip" data-layout="explore">Explore</button>
+          <button class="chip" data-layout="explore">Mix links</button>
           <button class="chip active" id="moments-toggle">Set moments</button>
         </div>
+        <p class="sidebar-hint sidebar-hint-layout">Mix map = BPM × energy truth · Mix links = harmonic ties (positions approximate)</p>
         <div class="map-actions">
           <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
           <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
@@ -1979,7 +1985,7 @@
       const hint = document.getElementById("view-hint");
       if (!hint) return;
       hint.textContent = state.layout === "explore"
-        ? "Explore: scroll or pinch to zoom · drag empty space to pan · drag nodes to rearrange"
+        ? "Mix links: scroll or pinch to zoom · drag empty space to pan · drag nodes to rearrange"
         : "Mix map: scroll or pinch to zoom · drag to pan · click a node to play";
     }
 
