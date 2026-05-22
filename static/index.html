@@ -626,15 +626,6 @@
       stroke-width: 1.25px;
     }
 
-    #graph-loupe .loupe-hover-ring {
-      fill: none;
-      stroke: var(--accent);
-      stroke-width: 1px;
-      vector-effect: non-scaling-stroke;
-      opacity: 0.55;
-      pointer-events: none;
-    }
-
     #graph.layout-explore .node circle.core {
       pointer-events: all;
       cursor: inherit;
@@ -1308,14 +1299,6 @@
         .attr("stroke-width", d => d.id === state.hoveredId ? 1.25 : 0.75);
 
       const hovered = nearby.find(d => d.id === state.hoveredId);
-      svg.selectAll("circle.loupe-hover-ring")
-        .data(hovered ? [hovered] : [])
-        .join("circle")
-        .attr("class", "loupe-hover-ring")
-        .attr("cx", d => center + (d.x - viewportX) * scale)
-        .attr("cy", d => center + (d.y - viewportY) * scale)
-        .attr("r", d => (nodeVisualRadius(d, true) + 4) * scale);
-
       svg.selectAll("circle.loupe-reticle")
         .data(hovered ? [hovered] : [])
         .join("circle")
