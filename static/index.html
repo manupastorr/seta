@@ -48,8 +48,15 @@
 
     .subtitle {
       color: var(--muted);
-      margin-bottom: 18px;
+      margin-bottom: 6px;
       font-size: 12px;
+    }
+
+    .analysis-note {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+      margin: 0 0 14px;
     }
 
     .stat-grid {
@@ -413,7 +420,8 @@
   <div id="app">
     <aside>
       <h1>Track Graph</h1>
-      <div class="subtitle">BPM × energy map with Camelot mix links</div>
+      <div class="subtitle">BPM × energy map · estimated mix hints</div>
+      <p class="analysis-note" id="analysis-note" hidden></p>
 
       <div class="stat-grid">
         <div class="stat"><div class="stat-label">Visible</div><div class="stat-value" id="stat-visible">–</div></div>
@@ -495,6 +503,8 @@
       "9A": "#1565C0", "9B": "#42A5F5", "10A": "#4527A0", "10B": "#7E57C2",
       "11A": "#6A1B9A", "11B": "#AB47BC", "12A": "#AD1457", "12B": "#EC407A"
     };
+
+    const LOW_BPM_CONFIDENCE = 0.45;
 
     const PLOT = {
       margin: { top: 44, right: 36, bottom: 52, left: 52 },
@@ -809,9 +819,25 @@
       });
     }
 
+    function edgeEndpointId(endpoint) {
+      return typeof endpoint === "object" && endpoint != null ? endpoint.id : endpoint;
+    }
+
     function visibleEdgeSet(trackIds) {
       const ids = new Set(trackIds.map(t => t.id));
-      return state.data.edges.filter(e => ids.has(e.source) && ids.has(e.target));
+      return state.data.edges.filter(e => {
+        const src = edgeEndpointId(e.source);
+        const tgt = edgeEndpointId(e.target);
+        return ids.has(src) && ids.has(tgt);
+      });
+    }
+
+    function linkForceData(edges) {
+      return edges.map(e => ({
+        ...e,
+        source: edgeEndpointId(e.source),
+        target: edgeEndpointId(e.target),
+      }));
     }
 
     function mixScore(a, b) {
@@ -904,6 +930,22 @@
       document.getElementById("stat-links").textContent = edges.length;
       document.getElementById("stat-library").textContent = state.data.tracks.filter(t => t.source === "tracks").length;
       document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
+      updateAnalysisNote(tracks);
+    }
+
+    function updateAnalysisNote(tracks) {
+      const el = document.getElementById("analysis-note");
+      const lowBpm = tracks.filter(t => t.bpm_confidence != null && t.bpm_confidence < LOW_BPM_CONFIDENCE).length;
+      if (!lowBpm) {
+        el.hidden = true;
+        el.textContent = "";
+        return;
+      }
+      el.hidden = false;
+      const scope = tracks.length === state.data.tracks.length ? "in library" : "on map";
+      el.textContent = lowBpm === 1
+        ? `1 track ${scope} has low BPM confidence — verify tempo in Rekordbox.`
+        : `${lowBpm} tracks ${scope} have low BPM confidence — verify tempo in Rekordbox.`;
     }
 
     function syncSourceFilterChips() {
@@ -1131,9 +1173,10 @@
         t.fy = null;
       });
 
+      const linkData = linkForceData(edges);
       const simulation = d3.forceSimulation(tracks)
         .alphaDecay(0.025)
-        .force("link", d3.forceLink(edges).id(d => d.id).distance(d => 90 - d.score * 40).strength(d => state.layout === "explore" ? d.score * 0.35 : 0))
+        .force("link", d3.forceLink(linkData).id(d => d.id).distance(d => 90 - d.score * 40).strength(d => state.layout === "explore" ? d.score * 0.35 : 0))
         .force("charge", d3.forceManyBody().strength(state.layout === "explore" ? -20 : -4))
         .force("collide", d3.forceCollide().radius(6).strength(0.92));
 
@@ -1147,7 +1190,7 @@
           .force("y", d3.forceY(d => trackPosition(d, x, y, true, plotWidth, plotHeight).y).strength(0.12));
       }
 
-      const link = viewport.append("g").attr("class", "links").selectAll("line").data(edges).join("line")
+      const link = viewport.append("g").attr("class", "links").selectAll("line").data(linkData).join("line")
         .attr("class", "link")
         .style("pointer-events", "none");
 
@@ -1251,7 +1294,7 @@
             : d.bpm_source === "tag"
               ? `<div class="row">BPM from file tag.</div>`
               : ""}
-          ${d.bpm_confidence != null && d.bpm_confidence < 0.45
+          ${d.bpm_confidence != null && d.bpm_confidence < LOW_BPM_CONFIDENCE
             ? `<div class="row">Low BPM confidence (${d.bpm_confidence.toFixed(2)}); verify in Rekordbox if needed.</div>`
             : ""}
           <div class="row">${d.genre}${d.batch ? " / " + d.batch : ""} · ${formatDuration(d.duration_sec)}</div>
