@@ -157,12 +157,6 @@
       box-shadow: inset 3px 0 0 var(--accent);
     }
 
-    .search-result-item {
-      grid-template-columns: minmax(0, 1fr) auto;
-      width: 100%;
-      text-align: left;
-    }
-
     .filter-bar #genre {
       width: auto;
       min-width: 118px;
@@ -177,11 +171,25 @@
       min-width: 150px;
     }
 
-    .filter-group-bpm .bpm-range {
+    .filter-group-bpm .bpm-range-block {
       flex: 1;
+      min-width: 72px;
+    }
+
+    .filter-group-bpm .bpm-range {
       height: 24px;
       margin: 0;
-      min-width: 72px;
+    }
+
+    .filter-group-bpm .bpm-range-ends {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 8px;
+      margin-top: 2px;
+      font-size: 10px;
+      line-height: 1;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
     }
 
     .filter-group-bpm .bpm-reset {
@@ -362,6 +370,12 @@
 
     .neighbor-item.is-active:hover {
       background: rgba(107, 79, 216, 0.17);
+    }
+
+    .neighbor-item.search-result-item {
+      grid-template-columns: minmax(0, 1fr) auto;
+      width: 100%;
+      text-align: left;
     }
 
     .neighbor-rank {
@@ -1443,7 +1457,6 @@
         </div>
 
         <div class="filter-group">
-          <span class="filter-label-inline">Source</span>
           <div class="chip-row" id="source-filters">
             <button class="chip active" data-source="all">All</button>
             <button class="chip" data-source="tracks">Library</button>
@@ -1452,17 +1465,24 @@
         </div>
 
         <div class="filter-group">
-          <label class="filter-label-inline" for="genre">Genre</label>
+          <label class="sr-only" for="genre">Genre</label>
           <select id="genre"><option value="all">All genres</option></select>
         </div>
 
         <div class="filter-group filter-group-bpm">
-          <label class="filter-label-inline" for="bpm-min">BPM <span id="bpm-label"></span></label>
           <button type="button" class="bpm-reset" id="bpm-reset" title="Reset BPM range" aria-label="Reset BPM range" disabled>↺</button>
-          <div class="bpm-range">
-            <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
-            <input id="bpm-min" type="range" min="70" max="180" value="70" />
-            <input id="bpm-max" type="range" min="70" max="180" value="180" />
+          <div class="bpm-range-block">
+            <div class="bpm-range">
+              <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
+              <label class="sr-only" for="bpm-min">Minimum BPM</label>
+              <input id="bpm-min" type="range" min="70" max="180" value="70" />
+              <label class="sr-only" for="bpm-max">Maximum BPM</label>
+              <input id="bpm-max" type="range" min="70" max="180" value="180" />
+            </div>
+            <div class="bpm-range-ends" aria-hidden="true">
+              <span id="bpm-min-label">70</span>
+              <span id="bpm-max-label">180</span>
+            </div>
           </div>
         </div>
 
@@ -3593,7 +3613,8 @@
     }
 
     function updateBpmLabel() {
-      document.getElementById("bpm-label").textContent = `${state.bpmMin}–${state.bpmMax}`;
+      document.getElementById("bpm-min-label").textContent = String(state.bpmMin);
+      document.getElementById("bpm-max-label").textContent = String(state.bpmMax);
       const lo = PLOT.bpmDomain[0];
       const hi = PLOT.bpmDomain[1];
       const span = hi - lo || 1;
