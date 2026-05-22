@@ -60,7 +60,7 @@ Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 
 - Single frontend file: `static/index.html` (D3, no build step)
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
-- Set-moment clouds are fixed BPM×energy zones (visual only): dance-floor arc plus **Close eyes** (slow listen) and **Chill groove** (soft pulse); toggle **Set moments**
+- Set-moment clouds are fixed BPM×energy zones (visual only): dance-floor arc plus **Close eyes**, **Chill groove**, and **Slow burn** (organic pulse at slow BPM); toggle **Set moments**
 - Keep changes minimal; no new dependencies without good reason
 
 ## Git
