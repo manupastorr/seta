@@ -71,7 +71,7 @@ UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confiden
 
 `vocals` is heuristic (`yes` / `no` / `unclear`) from harmonic mid-band + `yin` pitch voicing on the first ~45s — not speech recognition. Stricter thresholds in v9; show the player badge only when `vocals_confidence` ≥ 0.45.
 
-Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars, full-file analysis at scan).
+Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars from the first ~90s analysis window — intro/main preview, not full-track shape).
 
 Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a library-wide adaptive floor (p3 of scanned energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. Set-zone filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
 
