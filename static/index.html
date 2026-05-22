@@ -72,25 +72,27 @@
 
     .library-status {
       display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
+      flex-wrap: nowrap;
+      gap: 4px;
       margin: 0 0 14px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--panel-border);
+      min-height: 22px;
     }
 
     .status-item {
       display: inline-flex;
       align-items: baseline;
-      gap: 3px;
-      padding: 4px 7px;
+      gap: 2px;
+      padding: 2px 5px;
       border-radius: 999px;
       background: var(--panel);
       border: 1px solid var(--panel-border);
-      font-size: 10px;
+      font-size: 9px;
       color: var(--muted);
-      line-height: 1.2;
+      line-height: 1.15;
       white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .status-item.is-primary {
@@ -100,7 +102,7 @@
     }
 
     .status-value {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
       color: var(--text);
       font-variant-numeric: tabular-nums;
