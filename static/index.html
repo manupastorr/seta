@@ -265,7 +265,8 @@
       overflow: visible;
     }
 
-    #graph.is-over-node {
+    #graph.is-over-node,
+    #graph.is-over-node .zoom-surface {
       cursor: pointer;
     }
 
@@ -275,7 +276,7 @@
     }
 
     #graph .zoom-surface {
-      cursor: grab;
+      cursor: inherit;
     }
 
     .axis-label {
@@ -316,15 +317,7 @@
       pointer-events: none;
     }
 
-    .node circle.hit {
-      fill: transparent;
-      stroke: none;
-      pointer-events: all;
-      cursor: pointer;
-    }
-
     .node circle.core {
-      pointer-events: none;
       stroke-width: 0.75px;
       vector-effect: non-scaling-stroke;
     }
@@ -385,6 +378,11 @@
     .node.playing circle.core {
       stroke: var(--accent);
       stroke-width: 1.25px;
+    }
+
+    #graph.layout-explore .node circle.core {
+      pointer-events: all;
+      cursor: inherit;
     }
 
     .node.bpm-corrected circle.core {
@@ -724,7 +722,7 @@
 
     const LOW_BPM_CONFIDENCE = 0.45;
     const MIX_MIN_SCORE = 0.55;
-    const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, pickRadius: 20, hitRadius: 12, hideWhenHitPx: 22 };
+    const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5 };
 
     const PLOT = {
       margin: { top: 44, right: 36, bottom: 52, left: 52 },
@@ -771,7 +769,11 @@
       plotWidth: 0,
       plotHeight: 0,
       renderedTracks: [],
-      loupePointer: null
+      loupePointer: null,
+      pointerDown: null,
+      pointerDragged: false,
+      zoomGestureStart: null,
+      zoomGestureMoved: false
     };
 
     const audio = document.getElementById("audio");
@@ -813,18 +815,23 @@
       return 3 + (track.duration_sec ? Math.min(track.duration_sec / 180, 1) : 0);
     }
 
-    function pickNearestTrack(px, py, tracks, maxDist) {
-      let best = null;
-      let bestDist = maxDist;
+    function nodeHoverRadius(track) {
+      return nodeVisualRadius(track) + 2;
+    }
+
+    function trackAt(px, py, tracks) {
+      let hovered = null;
+      let bestDist = Infinity;
       for (const track of tracks) {
         if (track.x == null || track.y == null) continue;
+        const limit = nodeHoverRadius(track);
         const dist = Math.hypot(track.x - px, track.y - py);
-        if (dist <= bestDist) {
+        if (dist <= limit && dist < bestDist) {
           bestDist = dist;
-          best = track;
+          hovered = track;
         }
       }
-      return best;
+      return hovered;
     }
 
     function shouldShowLoupe() {
@@ -834,6 +841,86 @@
     function hideLoupe() {
       document.getElementById("graph-loupe").hidden = true;
       state.loupePointer = null;
+    }
+
+    function hideGraphHover() {
+      d3.select("#graph").classed("is-over-node", false);
+      tooltip.style.opacity = 0;
+    }
+
+    function updateGraphHover(event, px, py, tracks) {
+      const hovered = trackAt(px, py, tracks);
+      if (!hovered) {
+        hideGraphHover();
+        return;
+      }
+      d3.select("#graph").classed("is-over-node", true);
+      tooltip.style.opacity = 1;
+      positionTooltip(event);
+      tooltip.innerHTML = buildTrackTooltip(hovered);
+    }
+
+    function tryPlayTrackAt(event) {
+      if (state.pointerDragged || !state.viewport) return;
+      const [px, py] = d3.pointer(event, state.viewport.node());
+      const { plotWidth, plotHeight } = plotSize();
+      if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
+      const track = trackAt(px, py, state.renderedTracks);
+      if (track) setNowPlaying(track);
+    }
+
+    function bindGraphInteraction() {
+      const svg = d3.select("#graph");
+
+      svg.on("pointerdown.graph", (event) => {
+        if (event.button !== 0) return;
+        state.pointerDown = { x: event.clientX, y: event.clientY };
+        state.pointerDragged = false;
+      });
+
+      svg.on("pointermove.graph", (event) => {
+        if (state.pointerDown && !state.pointerDragged) {
+          const moved = Math.hypot(
+            event.clientX - state.pointerDown.x,
+            event.clientY - state.pointerDown.y
+          );
+          if (moved > LOUPE.clickDragTolerance) state.pointerDragged = true;
+        }
+        if (!state.viewport || svg.classed("is-panning")) {
+          hideLoupe();
+          hideGraphHover();
+          return;
+        }
+        const [px, py] = d3.pointer(event, state.viewport.node());
+        const { plotWidth, plotHeight } = plotSize();
+        if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) {
+          hideLoupe();
+          hideGraphHover();
+          return;
+        }
+        updateGraphHover(event, px, py, state.renderedTracks);
+        if (!shouldShowLoupe()) {
+          hideLoupe();
+          return;
+        }
+        const loupeEl = document.getElementById("graph-loupe");
+        loupeEl.hidden = false;
+        loupeEl.style.left = `${event.clientX}px`;
+        loupeEl.style.top = `${event.clientY}px`;
+        state.loupePointer = { x: px, y: py };
+        renderLoupe(px, py, state.renderedTracks);
+      });
+
+      svg.on("pointerup.graph pointercancel.graph", (event) => {
+        if (event.button === 0) tryPlayTrackAt(event);
+        state.pointerDown = null;
+        state.pointerDragged = false;
+      });
+
+      svg.on("mouseleave.graph", () => {
+        hideLoupe();
+        hideGraphHover();
+      });
     }
 
     function renderLoupe(viewportX, viewportY, tracks) {
@@ -863,42 +950,6 @@
         .attr("cx", center)
         .attr("cy", center)
         .attr("r", 4);
-    }
-
-    function bindLoupeHandlers() {
-      const svg = d3.select("#graph");
-
-      svg.on("mousemove.loupe", (event) => {
-        if (!state.viewport || svg.classed("is-panning") || !shouldShowLoupe()) {
-          hideLoupe();
-          return;
-        }
-        const [px, py] = d3.pointer(event, state.viewport.node());
-        const { plotWidth, plotHeight } = plotSize();
-        if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) {
-          hideLoupe();
-          return;
-        }
-        const loupeEl = document.getElementById("graph-loupe");
-        loupeEl.hidden = false;
-        loupeEl.style.left = `${event.clientX}px`;
-        loupeEl.style.top = `${event.clientY}px`;
-        state.loupePointer = { x: px, y: py };
-        renderLoupe(px, py, state.renderedTracks);
-      });
-
-      svg.on("mouseleave.loupe", () => {
-        hideLoupe();
-        svg.classed("is-over-node", false);
-      });
-
-      svg.on("click.pick", (event) => {
-        if (event.target.closest?.("circle.hit")) return;
-        if (!state.viewport) return;
-        const [px, py] = d3.pointer(event, state.viewport.node());
-        const track = pickNearestTrack(px, py, state.renderedTracks, LOUPE.pickRadius);
-        if (track) setNowPlaying(track);
-      });
     }
 
     function plotSize() {
@@ -1481,19 +1532,22 @@
       const hint = document.getElementById("view-hint");
       if (!hint) return;
       hint.textContent = state.layout === "explore"
-        ? "Explore: scroll or pinch to zoom · Option+drag to pan · drag nodes to rearrange"
-        : "Mix map: scroll or pinch to zoom · Option+drag to pan · click a node to play";
+        ? "Explore: scroll or pinch to zoom · drag empty space to pan · drag nodes to rearrange"
+        : "Mix map: scroll or pinch to zoom · drag to pan · click a node to play";
     }
 
     function zoomFilter(event) {
       if (event.type === "wheel") return true;
       if (event.type.startsWith("touch")) return true;
       if (event.button === 1) return true;
-      if (event.altKey || event.shiftKey) {
+      if (state.layout === "explore") {
+        if (event.altKey || event.shiftKey) {
+          return event.type === "mousedown" && event.button === 0;
+        }
+        const target = event.target;
+        if (target.closest && target.closest("circle.core")) return false;
         return event.type === "mousedown" && event.button === 0;
       }
-      const target = event.target;
-      if (target.closest && (target.closest("circle.core") || target.closest("circle.hit"))) return false;
       return event.type === "mousedown" && event.button === 0;
     }
 
@@ -1503,9 +1557,30 @@
       }
       state.zoomBehavior
         .filter(zoomFilter)
-        .on("start", () => svg.classed("is-panning", true))
-        .on("end", () => svg.classed("is-panning", false))
+        .on("start", (event) => {
+          if (!event.sourceEvent) return;
+          svg.classed("is-panning", true);
+          state.zoomGestureMoved = false;
+          state.zoomGestureStart = { x: event.sourceEvent.clientX, y: event.sourceEvent.clientY };
+        })
+        .on("end", (event) => {
+          if (!event.sourceEvent) return;
+          svg.classed("is-panning", false);
+          const movedFromStart = state.zoomGestureStart
+            ? Math.hypot(
+              event.sourceEvent.clientX - state.zoomGestureStart.x,
+              event.sourceEvent.clientY - state.zoomGestureStart.y
+            ) > LOUPE.clickDragTolerance
+            : false;
+          if (state.zoomGestureMoved || movedFromStart) {
+            state.pointerDragged = true;
+          }
+          state.zoomGestureStart = null;
+        })
         .on("zoom", (event) => {
+          if (event.sourceEvent && event.sourceEvent.type !== "wheel") {
+            state.zoomGestureMoved = true;
+          }
           const { plotWidth, plotHeight } = plotSize();
           const next = clampTransform(event.transform, plotWidth, plotHeight, state.layout);
           state.zoomTransform = next;
@@ -1522,7 +1597,7 @@
       updateStats(tracks, edges);
       rebuildPlayQueue(state.playingId || state.selectedId);
 
-      d3.select("#graph").classed("is-over-node", false);
+      d3.select("#graph").classed("is-over-node", false).classed("layout-explore", state.layout === "explore");
 
       const { width, height, plotWidth, plotHeight } = plotSize();
       state.plotWidth = plotWidth;
@@ -1632,6 +1707,7 @@
         .clickDistance(4)
         .filter((event) => state.layout === "explore" && !event.altKey && !event.shiftKey)
         .on("start", (event, d) => {
+          state.pointerDragged = true;
           event.sourceEvent.stopPropagation();
           if (!event.active) simulation.alphaTarget(0.25).restart();
           const [px, py] = d3.pointer(event, viewport.node());
@@ -1655,10 +1731,6 @@
           return parts.join(" ");
         })
         .call(drag);
-
-      node.append("circle")
-        .attr("class", "hit")
-        .attr("r", LOUPE.hitRadius);
 
       node.append("circle")
         .attr("class", "core")
@@ -1695,25 +1767,6 @@
           if (playing) document.getElementById("now-meta").textContent = trackMetaLine(playing);
         }
       }
-
-      node.on("mouseenter.cursor", () => {
-        svg.classed("is-over-node", true);
-      }).on("mouseleave.cursor", () => {
-        svg.classed("is-over-node", false);
-      });
-
-      node.on("mouseenter", (event, d) => {
-        tooltip.style.opacity = 1;
-        positionTooltip(event);
-        tooltip.innerHTML = buildTrackTooltip(d);
-      }).on("mousemove", (event) => {
-        positionTooltip(event);
-      }).on("mouseleave", () => {
-        tooltip.style.opacity = 0;
-      }).on("click", (event, d) => {
-        event.stopPropagation();
-        setNowPlaying(d);
-      });
 
       state.renderedTracks = tracks;
 
@@ -1765,7 +1818,7 @@
 
     async function init() {
       buildLegend();
-      bindLoupeHandlers();
+      bindGraphInteraction();
       const res = await fetch("/api/library");
       state.data = await res.json();
       populateGenres(state.data.tracks);
