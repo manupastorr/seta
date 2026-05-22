@@ -95,7 +95,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 |-------|------|
 | `config.py` | Paths and port from env / `.env` |
 | `scan_library.py` | Walks audio folders, analyzes tracks, writes `library.json` + mix edges |
-| `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy, vocals hint, Serato-style waveform peaks (full track) |
+| `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy, vocals hint, Serato-style waveform peaks (400 bars from first ~90s window) |
 | `camelot.py` | Wheel colors + mix compatibility scoring |
 | `server.py` | Flask: UI, `/api/library`, audio streaming |
 | `static/index.html` | Single-page D3 map + player |
@@ -116,10 +116,11 @@ Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze
 
 ## Tests
 
-From the project folder (after `.venv` exists):
+From the repo root after `./start.sh` has created `.venv` once:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
+node --test tests/test_playback.mjs
 ```
 
 ## Scanner exclusions
