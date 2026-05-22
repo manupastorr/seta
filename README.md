@@ -17,6 +17,8 @@ cd seta
 
 `./start.sh` scans then starts the server. Open the URL printed in the terminal (default **http://127.0.0.1:8765**). Cached analysis is reused when files are unchanged.
 
+**Demo / landing page:** https://manupastorr.github.io/seta-landing/
+
 For a faster scan after adding only a few tracks (skips mix-edge rebuild):
 
 ```bash
