@@ -85,7 +85,6 @@ Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.js
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
 - Changing filters (set zones, Camelot, genre, BPM range, search, library source) auto-zooms to the visible filtered nodes; clearing all filters resets the map view. Active filters show in a header summary chip; filter state persists in `sessionStorage` for the tab session
 - Set-zone clouds are fixed BPM×energy regions (visual only); legend order follows set flow: **Open / low** → **Floor** → **Late** → **Wind-down** (Closing last). Title: **Set zones**
-- Track tooltip and player badges link to Soundeo search (`Artist Title`, `availableFilter=1`) when artist/title are known
 - Keep changes minimal; no new dependencies without good reason
 
 ## Git
