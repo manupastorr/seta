@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Track Graph</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="/static/playback.js"></script>
   <style>
     :root {
       --bg: #ffffff;
@@ -1082,6 +1083,8 @@
   </div>
 
   <script>
+    const PB = TrackGraphPlayback;
+
     const CAMELOT_WHEEL_SIZE = 168;
 
     const CAMELOT_COLORS = {
@@ -1124,8 +1127,10 @@
       selectedId: null,
       playingId: null,
       playQueue: [],
+      playQueueSig: "",
       playIndex: -1,
       highlightNeighbors: false,
+      neighborQueueAnchor: null,
       layout: "mix",
       showMoments: true,
       activeMoments: new Set(),
@@ -2055,6 +2060,17 @@
       return `${m}:${s}`;
     }
 
+    function playbackSelection() {
+      return {
+        highlightNeighbors: state.highlightNeighbors,
+        neighborQueueAnchor: state.neighborQueueAnchor,
+      };
+    }
+
+    function syncPlayQueue() {
+      PB.syncPlayQueueState(state, filteredTracks(), playbackSelection());
+    }
+
     function filteredTracks() {
       const q = state.search.trim().toLowerCase();
       return state.data.tracks.filter(t => {
@@ -2122,13 +2138,7 @@
     }
 
     function mixNeighbors(trackId, tracks) {
-      const selected = tracks.find(t => t.id === trackId);
-      if (!selected) return { ids: new Set([trackId]), list: [] };
-
-      const list = tracks.filter(t => t.id !== trackId && mixScore(selected, t) >= MIX_MIN_SCORE);
-      list.sort((a, b) => mixScore(selected, b) - mixScore(selected, a));
-      const ids = new Set([trackId, ...list.map(t => t.id)]);
-      return { ids, list };
+      return PB.mixNeighbors(trackId, tracks, MIX_MIN_SCORE);
     }
 
     function neighborIds(trackId) {
@@ -2334,27 +2344,13 @@
       `;
     }
 
-    function rebuildPlayQueue(preferredId) {
-      state.playQueue = filteredTracks();
-      if (!state.playQueue.length) {
-        state.playIndex = -1;
-        return;
-      }
-      if (preferredId) {
-        const idx = state.playQueue.findIndex(t => t.id === preferredId);
-        state.playIndex = idx >= 0 ? idx : 0;
-      } else if (state.playIndex >= state.playQueue.length) {
-        state.playIndex = state.playQueue.length - 1;
-      }
-    }
-
     function playTrackAt(index, autoplay = true) {
-      if (!state.playQueue.length) rebuildPlayQueue(state.playingId || state.selectedId);
+      if (!state.playQueue.length) syncPlayQueue();
       if (!state.playQueue.length || index < 0 || index >= state.playQueue.length) return;
       state.playIndex = index;
       const track = state.playQueue[index];
-      state.selectedId = track.id;
       state.playingId = track.id;
+      if (!state.highlightNeighbors) state.selectedId = track.id;
       updatePlayerTrack(track);
       waveformWrap.classList.remove("is-empty");
       loadTrackAudio(track.id, autoplay);
@@ -2365,9 +2361,11 @@
     }
 
     function setNowPlaying(track, autoplay = true) {
-      state.playQueue = filteredTracks();
-      const idx = state.playQueue.findIndex(t => t.id === track.id);
-      playTrackAt(idx >= 0 ? idx : 0, autoplay);
+      state.selectedId = track.id;
+      if (state.highlightNeighbors) state.neighborQueueAnchor = track.id;
+      syncPlayQueue();
+      const idx = PB.resolvePlayIndex(state.playQueue, track.id);
+      playTrackAt(idx, autoplay);
     }
 
     function togglePlayPause() {
@@ -2378,11 +2376,9 @@
     }
 
     function playRelative(step) {
-      rebuildPlayQueue(state.playingId || state.selectedId);
+      syncPlayQueue();
       if (!state.playQueue.length) return;
-      let idx = state.playIndex >= 0 ? state.playIndex + step : 0;
-      if (idx < 0) idx = state.playQueue.length - 1;
-      if (idx >= state.playQueue.length) idx = 0;
+      const idx = PB.advancePlayIndex(state.playQueue, state.playIndex, step);
       playTrackAt(idx, true);
     }
 
@@ -2524,7 +2520,7 @@
       }
       const edges = visibleEdgeSet(tracks);
       updateStats(tracks);
-      rebuildPlayQueue(state.playingId || state.selectedId);
+      syncPlayQueue();
 
       d3.select("#graph").classed("is-over-node", false).classed("layout-explore", state.layout === "explore");
 
@@ -2694,12 +2690,12 @@
 
         if (active && state.highlightNeighbors) {
           const { list } = mixNeighbors(active, tracks);
-          const playing = state.data.tracks.find(t => t.id === active);
-          if (playing && list.length) {
-            updatePlayerTrack(
-              playing,
-              `${list.length} mixable neighbor${list.length === 1 ? "" : "s"}`
-            );
+          const playing = state.data.tracks.find(t => t.id === (state.playingId || active));
+          if (playing) {
+            const note = list.length
+              ? `${list.length} mixable neighbor${list.length === 1 ? "" : "s"}`
+              : undefined;
+            updatePlayerTrack(playing, note);
           }
         } else if (state.playingId) {
           const playing = state.data.tracks.find(t => t.id === state.playingId);
@@ -2946,11 +2942,16 @@
           return;
         }
         state.highlightNeighbors = !state.highlightNeighbors;
-        state.refreshHighlight?.();
         if (state.highlightNeighbors) {
+          state.neighborQueueAnchor = state.selectedId;
+          syncPlayQueue();
           const ids = neighborIds(state.selectedId);
           setTimeout(() => focusOnIds(ids), 300);
+        } else {
+          state.neighborQueueAnchor = null;
+          syncPlayQueue();
         }
+        state.refreshHighlight?.();
       });
 
       updateNeighborsButton(null, 0);

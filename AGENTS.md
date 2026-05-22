@@ -43,9 +43,10 @@ After changing `analyze.py`, bump `ANALYSIS_VERSION` so the cache re-analyzes st
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
+node --test tests/test_playback.mjs
 ```
 
-Covers scanner path rules, Camelot/mix scoring, and optional sanity check against a local `library.json` if present.
+Covers scanner path rules, Camelot/mix scoring, play-queue navigation (`static/playback.js`), and optional sanity check against a local `library.json` if present.
 
 ## Analysis vs Rekordbox
 
