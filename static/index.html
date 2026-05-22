@@ -267,10 +267,17 @@
       pointer-events: none;
     }
 
-    #main > :not(#graph) {
+    #main > :not(#graph):not(.topbar):not(.legend):not(.moments-legend):not(.tooltip):not(#graph-loupe) {
       pointer-events: auto;
       position: relative;
       z-index: 1;
+    }
+
+    #main > .topbar,
+    #main > .legend,
+    #main > .moments-legend {
+      position: absolute;
+      pointer-events: auto;
     }
 
     #graph {
@@ -605,7 +612,15 @@
       max-width: 248px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
       z-index: 4;
-      pointer-events: none;
+      pointer-events: auto;
+    }
+
+    .moments-legend-hint {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      margin: -4px 0 8px;
+      line-height: 1.3;
     }
 
     .moments-legend-title {
@@ -632,6 +647,24 @@
       line-height: 1.2;
       color: var(--text);
       min-width: 0;
+      width: 100%;
+      padding: 4px 6px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+    }
+
+    .moment-legend-item:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .moment-legend-item.active {
+      background: var(--accent-soft);
+      border-color: rgba(107, 79, 216, 0.28);
+      color: var(--accent);
     }
 
     .moment-cloud {
@@ -784,6 +817,7 @@
       highlightNeighbors: false,
       layout: "mix",
       showMoments: true,
+      activeMoments: new Set(),
       sources: new Set(["tracks", "to_curate"]),
       genre: "all",
       search: "",
@@ -1007,10 +1041,13 @@
     function plotSize() {
       const width = document.getElementById("app").clientWidth;
       const height = window.innerHeight;
+      const plotLeft = sidebarWidth() + PLOT.margin.left;
+      const plotWidth = Math.max(120, width - plotLeft - PLOT.margin.right);
       return {
         width,
         height,
-        plotWidth: width - PLOT.margin.left - PLOT.margin.right,
+        plotLeft,
+        plotWidth,
         plotHeight: height - PLOT.margin.top - PLOT.margin.bottom
       };
     }
@@ -1077,6 +1114,24 @@
       return { x: px, y: py };
     }
 
+    function trackMatchesMoment(track, moment) {
+      if (track.bpm == null) return false;
+      const energy = track.energy ?? 0.5;
+      return track.bpm >= moment.bpm[0]
+        && track.bpm <= moment.bpm[1]
+        && energy >= moment.energy[0]
+        && energy <= moment.energy[1];
+    }
+
+    function trackMatchesActiveMoments(track) {
+      if (!state.activeMoments.size) return true;
+      for (const id of state.activeMoments) {
+        const moment = SET_MOMENTS.find(m => m.id === id);
+        if (moment && trackMatchesMoment(track, moment)) return true;
+      }
+      return false;
+    }
+
     function momentEllipse(moment, x, y) {
       const bpmMid = (moment.bpm[0] + moment.bpm[1]) / 2;
       const energyMid = (moment.energy[0] + moment.energy[1]) / 2;
@@ -1112,7 +1167,7 @@
           .attr("rx", rx)
           .attr("ry", ry)
           .attr("fill", moment.color)
-          .attr("fill-opacity", 0.09)
+          .attr("fill-opacity", state.activeMoments.has(moment.id) ? 0.16 : 0.09)
           .attr("filter", "url(#moment-blur)")
           .style("pointer-events", "none");
 
@@ -1130,14 +1185,23 @@
 
     function updateMomentsLegend() {
       const legend = document.getElementById("moments-legend");
-      const visible = state.showMoments;
-      legend.hidden = !visible;
-      if (!visible) return;
-      legend.innerHTML = '<span class="moments-legend-title">Set moments</span><div class="moments-legend-grid"></div>';
+      if (!state.showMoments) {
+        legend.hidden = true;
+        return;
+      }
+      legend.hidden = false;
+      const filterOn = state.activeMoments.size > 0;
+      legend.innerHTML = `
+        <span class="moments-legend-title">Set moments</span>
+        <span class="moments-legend-hint">${filterOn ? "Showing tracks in selected zones" : "Click a zone to filter tracks"}</span>
+        <div class="moments-legend-grid"></div>`;
       const grid = legend.querySelector(".moments-legend-grid");
       SET_MOMENTS.forEach(moment => {
-        const row = document.createElement("div");
+        const row = document.createElement("button");
+        row.type = "button";
         row.className = "moment-legend-item";
+        row.classList.toggle("active", state.activeMoments.has(moment.id));
+        row.dataset.momentId = moment.id;
         row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label">${moment.label}</span>`;
         grid.appendChild(row);
       });
@@ -1175,32 +1239,32 @@
       }
     }
 
-    function drawAxisLabels(layer, plotWidth, plotHeight) {
+    function drawAxisLabels(layer, plotLeft, plotWidth, plotHeight) {
       layer.selectAll("*").remove();
       layer.append("text")
         .attr("class", "axis-label")
-        .attr("x", PLOT.margin.left + plotWidth / 2)
+        .attr("x", plotLeft + plotWidth / 2)
         .attr("y", PLOT.margin.top + plotHeight + 40)
         .attr("text-anchor", "middle")
         .text("BPM →");
       layer.append("text")
         .attr("class", "axis-label")
-        .attr("x", 16)
+        .attr("x", plotLeft - 36)
         .attr("y", PLOT.margin.top + plotHeight / 2)
-        .attr("transform", `rotate(-90 16 ${PLOT.margin.top + plotHeight / 2})`)
+        .attr("transform", `rotate(-90 ${plotLeft - 36} ${PLOT.margin.top + plotHeight / 2})`)
         .attr("text-anchor", "middle")
         .text("Energy →");
     }
 
-    function clampTransform(transform, plotWidth, plotHeight, layout = state.layout) {
+    function clampTransform(transform, plotLeft, plotWidth, plotHeight, layout = state.layout) {
       const k = Math.max(1, Math.min(10, transform.k));
       let x = transform.x;
       let y = transform.y;
 
       if (layout === "explore") {
         const pad = 240;
-        const minX = PLOT.margin.left + plotWidth * (1 - k) - pad;
-        const maxX = PLOT.margin.left + pad;
+        const minX = plotLeft + plotWidth * (1 - k) - pad;
+        const maxX = plotLeft + pad;
         const minY = PLOT.margin.top + plotHeight * (1 - k) - pad;
         const maxY = PLOT.margin.top + pad;
         x = Math.min(maxX, Math.max(minX, x));
@@ -1209,11 +1273,11 @@
       }
 
       if (k <= 1.001) {
-        x = PLOT.margin.left;
+        x = plotLeft;
         y = PLOT.margin.top;
       } else {
-        const minX = PLOT.margin.left + plotWidth * (1 - k);
-        const maxX = PLOT.margin.left;
+        const minX = plotLeft + plotWidth * (1 - k);
+        const maxX = plotLeft;
         const minY = PLOT.margin.top + plotHeight * (1 - k);
         const maxY = PLOT.margin.top;
         x = Math.min(maxX, Math.max(minX, x));
@@ -1222,10 +1286,10 @@
       return d3.zoomIdentity.translate(x, y).scale(k);
     }
 
-    function fitTransformToNodes(tracks, plotWidth, plotHeight, padding = 64) {
+    function fitTransformToNodes(tracks, plotLeft, plotWidth, plotHeight, padding = 64) {
       const pts = tracks.filter(t => t.x != null && t.y != null);
       if (!pts.length) {
-        return d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top);
+        return d3.zoomIdentity.translate(plotLeft, PLOT.margin.top);
       }
       const minX = d3.min(pts, t => t.x) - padding;
       const maxX = d3.max(pts, t => t.x) + padding;
@@ -1238,10 +1302,11 @@
       const cy = (minY + maxY) / 2;
       return clampTransform(
         d3.zoomIdentity
-          .translate(PLOT.margin.left, PLOT.margin.top)
+          .translate(plotLeft, PLOT.margin.top)
           .translate(plotWidth / 2, plotHeight / 2)
           .scale(scale)
           .translate(-cx, -cy),
+        plotLeft,
         plotWidth,
         plotHeight,
         "explore"
@@ -1264,6 +1329,7 @@
           const hay = `${t.artist} ${t.title} ${t.genre} ${t.batch || ""}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
+        if (!trackMatchesActiveMoments(t)) return false;
         return true;
       });
     }
@@ -1342,12 +1408,12 @@
     }
 
     function focusOnIds(ids) {
-      const { plotWidth, plotHeight } = plotSize();
+      const { plotLeft, plotWidth, plotHeight } = plotSize();
       const tracks = filteredTracks().filter(t => ids.has(t.id) && t.x != null && t.y != null);
       if (tracks.length < 1 || !state.svg || !state.zoomBehavior) return;
 
       const transform = state.layout === "explore"
-        ? fitTransformToNodes(tracks, plotWidth, plotHeight, 90)
+        ? fitTransformToNodes(tracks, plotLeft, plotWidth, plotHeight, 90)
         : (() => {
           const pad = 50;
           const minX = d3.min(tracks, t => t.x) - pad;
@@ -1361,10 +1427,11 @@
           const cy = (minY + maxY) / 2;
           return clampTransform(
             d3.zoomIdentity
-              .translate(PLOT.margin.left, PLOT.margin.top)
+              .translate(plotLeft, PLOT.margin.top)
               .translate(plotWidth / 2, plotHeight / 2)
               .scale(scale)
               .translate(-cx, -cy),
+            plotLeft,
             plotWidth,
             plotHeight,
             state.layout
@@ -1633,8 +1700,8 @@
           if (event.sourceEvent && event.sourceEvent.type !== "wheel") {
             state.zoomGestureMoved = true;
           }
-          const { plotWidth, plotHeight } = plotSize();
-          const next = clampTransform(event.transform, plotWidth, plotHeight, state.layout);
+          const { plotLeft, plotWidth, plotHeight } = plotSize();
+          const next = clampTransform(event.transform, plotLeft, plotWidth, plotHeight, state.layout);
           state.zoomTransform = next;
           viewport.attr("transform", next);
           if (!shouldShowLoupe()) hideLoupe();
@@ -1651,7 +1718,7 @@
 
       d3.select("#graph").classed("is-over-node", false).classed("layout-explore", state.layout === "explore");
 
-      const { width, height, plotWidth, plotHeight } = plotSize();
+      const { width, height, plotLeft, plotWidth, plotHeight } = plotSize();
       state.plotWidth = plotWidth;
       state.plotHeight = plotHeight;
       const x = bpmScale(plotWidth);
@@ -1660,7 +1727,7 @@
 
       if (state.svg && state.viewport) {
         state.viewport.selectAll("*").remove();
-        drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
+        drawAxisLabels(state.axisLayer, plotLeft, plotWidth, plotHeight);
       } else {
         svg.selectAll("*").remove();
         svg.attr("viewBox", `0 0 ${width} ${height}`);
@@ -1669,12 +1736,13 @@
         state.viewport = svg.append("g").attr("class", "viewport");
         ensureMomentDefs(svg);
         state.zoomTransform = clampTransform(
-          d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
+          d3.zoomIdentity.translate(plotLeft, PLOT.margin.top),
+          plotLeft,
           plotWidth,
           plotHeight,
           state.layout
         );
-        drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
+        drawAxisLabels(state.axisLayer, plotLeft, plotWidth, plotHeight);
       }
 
       bindZoom(svg, state.viewport);
@@ -1682,7 +1750,7 @@
       svg.attr("viewBox", `0 0 ${width} ${height}`);
       ensureMomentDefs(svg);
       state.viewport.attr("transform", state.zoomTransform);
-      drawAxisLabels(state.axisLayer, plotWidth, plotHeight);
+      drawAxisLabels(state.axisLayer, plotLeft, plotWidth, plotHeight);
 
       const viewport = state.viewport;
 
@@ -1855,9 +1923,10 @@
 
     function resetView(animate = true) {
       if (!state.svg || !state.zoomBehavior) return;
-      const { plotWidth, plotHeight } = plotSize();
+      const { plotLeft, plotWidth, plotHeight } = plotSize();
       const transform = clampTransform(
-        d3.zoomIdentity.translate(PLOT.margin.left, PLOT.margin.top),
+        d3.zoomIdentity.translate(plotLeft, PLOT.margin.top),
+        plotLeft,
         plotWidth,
         plotHeight,
         state.layout
@@ -1945,6 +2014,15 @@
       document.getElementById("moments-toggle").addEventListener("click", (e) => {
         state.showMoments = !state.showMoments;
         e.currentTarget.classList.toggle("active", state.showMoments);
+        renderGraph();
+      });
+
+      document.getElementById("moments-legend").addEventListener("click", (e) => {
+        const btn = e.target.closest(".moment-legend-item");
+        if (!btn) return;
+        const id = btn.dataset.momentId;
+        if (state.activeMoments.has(id)) state.activeMoments.delete(id);
+        else state.activeMoments.add(id);
         renderGraph();
       });
 
