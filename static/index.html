@@ -314,11 +314,11 @@
       right: 18px;
       bottom: 18px;
       width: max-content;
-      max-width: 148px;
+      max-width: 196px;
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid var(--panel-border);
       border-radius: 14px;
-      padding: 8px 10px 10px;
+      padding: 10px 12px 12px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
       z-index: 4;
       pointer-events: none;
@@ -326,21 +326,21 @@
 
     .legend-title {
       display: block;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--muted);
       text-align: center;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .camelot-wheel {
       display: block;
-      width: 120px;
-      height: 120px;
-      max-width: 120px;
-      max-height: 120px;
+      width: 168px;
+      height: 168px;
+      max-width: 168px;
+      max-height: 168px;
       flex-shrink: 0;
       cursor: default;
       touch-action: auto;
@@ -348,14 +348,17 @@
 
     .camelot-wheel text {
       font-family: inherit;
-      font-size: 6.5px;
-      font-weight: 600;
-      fill: rgba(26, 26, 36, 0.88);
+      font-size: 8px;
+      font-weight: 700;
       pointer-events: none;
+      paint-order: stroke fill;
+      stroke: rgba(255, 255, 255, 0.35);
+      stroke-width: 0.45px;
+      stroke-linejoin: round;
     }
 
     .tooltip {
-      position: absolute;
+      position: fixed;
       pointer-events: none;
       background: rgba(255, 255, 255, 0.98);
       border: 1px solid var(--panel-border);
@@ -467,9 +470,9 @@
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid var(--panel-border);
       border-radius: 14px;
-      padding: 8px 10px;
-      width: 196px;
-      max-width: 196px;
+      padding: 10px 12px;
+      width: 248px;
+      max-width: 248px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
       z-index: 4;
       pointer-events: none;
@@ -477,25 +480,25 @@
 
     .moments-legend-title {
       display: block;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--muted);
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .moments-legend-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 4px 8px;
+      gap: 6px 10px;
     }
 
     .moment-legend-item {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 10px;
+      gap: 6px;
+      font-size: 12px;
       line-height: 1.2;
       color: var(--text);
       min-width: 0;
@@ -503,7 +506,7 @@
 
     .moment-cloud {
       flex-shrink: 0;
-      font-size: 13px;
+      font-size: 16px;
       line-height: 1;
       filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
     }
@@ -600,6 +603,8 @@
   </div>
 
   <script>
+    const CAMELOT_WHEEL_SIZE = 168;
+
     const CAMELOT_COLORS = {
       "1A": "#C62828", "1B": "#EF5350", "2A": "#E65100", "2B": "#FF9800",
       "3A": "#F57F17", "3B": "#FFCA28", "4A": "#9E9D24", "4B": "#CDDC39",
@@ -663,6 +668,33 @@
 
     function camelotColor(key) {
       return CAMELOT_COLORS[key] || "#555770";
+    }
+
+    function camelotLabelColor(hex) {
+      const value = hex.replace("#", "");
+      const r = parseInt(value.slice(0, 2), 16);
+      const g = parseInt(value.slice(2, 4), 16);
+      const b = parseInt(value.slice(4, 6), 16);
+      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return lum > 0.62 ? "#1a1a24" : "#ffffff";
+    }
+
+    function annularWedge(cx, cy, rInner, rOuter, startAngle, endAngle) {
+      const x1 = cx + rOuter * Math.cos(startAngle);
+      const y1 = cy + rOuter * Math.sin(startAngle);
+      const x2 = cx + rOuter * Math.cos(endAngle);
+      const y2 = cy + rOuter * Math.sin(endAngle);
+      const x3 = cx + rInner * Math.cos(endAngle);
+      const y3 = cy + rInner * Math.sin(endAngle);
+      const x4 = cx + rInner * Math.cos(startAngle);
+      const y4 = cy + rInner * Math.sin(startAngle);
+      return [
+        `M ${x1.toFixed(2)} ${y1.toFixed(2)}`,
+        `A ${rOuter} ${rOuter} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
+        `L ${x3.toFixed(2)} ${y3.toFixed(2)}`,
+        `A ${rInner} ${rInner} 0 0 0 ${x4.toFixed(2)} ${y4.toFixed(2)}`,
+        "Z"
+      ].join(" ");
     }
 
     function plotSize() {
@@ -1078,6 +1110,11 @@
       return `${track.bpm} BPM`;
     }
 
+    function positionTooltip(event) {
+      tooltip.style.left = `${event.clientX + 14}px`;
+      tooltip.style.top = `${event.clientY + 10}px`;
+    }
+
     function buildTrackTooltip(track) {
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : null;
       const keyText = track.key || "?";
@@ -1177,36 +1214,37 @@
 
     function buildLegend() {
       const legend = document.getElementById("legend");
-      const size = 120;
+      const size = CAMELOT_WHEEL_SIZE;
       const cx = size / 2;
       const cy = size / 2;
-      const rA = 26;
-      const rB = 42;
-      const dotR = 4.2;
+      const rInner = 14;
+      const rMid = 45;
+      const rOuter = 76;
       let svg = "";
 
-      for (let i = 1; i <= 12; i++) {
-        const angle = ((i - 1) / 12) * Math.PI * 2 - Math.PI / 2;
+      for (let slot = 0; slot < 12; slot++) {
+        const keyNum = slot === 0 ? 12 : slot;
+        const start = slot * (Math.PI * 2 / 12) - Math.PI / 2;
+        const end = (slot + 1) * (Math.PI * 2 / 12) - Math.PI / 2;
+        const mid = (start + end) / 2;
         [
-          { r: rA, suffix: "A" },
-          { r: rB, suffix: "B" }
-        ].forEach(({ r, suffix }) => {
-          const code = `${i}${suffix}`;
+          { suffix: "A", r0: rInner, r1: rMid },
+          { suffix: "B", r0: rMid, r1: rOuter }
+        ].forEach(({ suffix, r0, r1 }) => {
+          const code = `${keyNum}${suffix}`;
           const color = CAMELOT_COLORS[code];
-          const x = cx + Math.cos(angle) * r;
-          const y = cy + Math.sin(angle) * r;
-          const lx = cx + Math.cos(angle) * (r + 8.5);
-          const ly = cy + Math.sin(angle) * (r + 8.5);
-          svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}" fill="${color}"/>`;
-          svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${code}</text>`;
+          const labelR = (r0 + r1) / 2;
+          const lx = cx + Math.cos(mid) * labelR;
+          const ly = cy + Math.sin(mid) * labelR;
+          const labelColor = camelotLabelColor(color);
+          svg += `<path d="${annularWedge(cx, cy, r0, r1, start, end)}" fill="${color}" stroke="rgba(0,0,0,0.12)" stroke-width="0.45"/>`;
+          svg += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="${labelColor}">${code}</text>`;
         });
       }
 
       legend.innerHTML = `
         <span class="legend-title">Camelot</span>
         <svg class="camelot-wheel" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Camelot key wheel">
-          <circle cx="${cx}" cy="${cy}" r="${rA - 8}" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="0.75"/>
-          <circle cx="${cx}" cy="${cy}" r="${(rA + rB) / 2}" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="0.75"/>
           ${svg}
         </svg>`;
     }
@@ -1432,12 +1470,10 @@
 
       node.on("mouseenter", (event, d) => {
         tooltip.style.opacity = 1;
-        tooltip.style.left = `${event.pageX + 14}px`;
-        tooltip.style.top = `${event.pageY + 10}px`;
+        positionTooltip(event);
         tooltip.innerHTML = buildTrackTooltip(d);
       }).on("mousemove", (event) => {
-        tooltip.style.left = `${event.pageX + 14}px`;
-        tooltip.style.top = `${event.pageY + 10}px`;
+        positionTooltip(event);
       }).on("mouseleave", () => {
         tooltip.style.opacity = 0;
       }).on("click", (_, d) => {
