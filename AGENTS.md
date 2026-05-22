@@ -69,13 +69,14 @@ Unified resolver in `analyze.py` (see `ANALYSIS_VERSION`):
 
 UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confidence`, `vocals`, `vocals_confidence`
 
-`vocals` is heuristic (`yes` / `no` / `unclear`) from harmonic mid-band + pitch voicing on the analysis window — not speech recognition. Show the player badge only when `vocals_confidence` ≥ 0.55.
+`vocals` is heuristic (`yes` / `no` / `unclear`) from harmonic mid-band + `yin` pitch voicing on the first ~45s — not speech recognition. Show the player badge only when `vocals_confidence` ≥ 0.45.
 
 Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 
 ## UI conventions
 
 - Single frontend file: `static/index.html` (D3, no build step)
+- Bottom **player dock** (full-width, SoundCloud-style): transport, title/artist, badges, wide waveform; sidebar is filters/map only
 - Player uses a Serato-style RGB canvas waveform (red bass / green mids / blue highs); one `fetch` per track feeds both `<audio>` (blob URL) and waveform decode; peaks + blob URL cached in memory (24 tracks)
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
 - Set-moment clouds are fixed BPM×energy zones (visual only): dance-floor arc plus **Close eyes**, **Chill groove**, and **Slow burn** (organic pulse at slow BPM); toggle **Set moments**
