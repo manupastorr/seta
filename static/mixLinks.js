@@ -3,10 +3,9 @@
  */
 (function (root, factory) {
   const api = factory();
+  root.MixLinksUi = api;
   if (typeof module !== "undefined" && module.exports) {
     module.exports = api;
-  } else {
-    root.MixLinksUi = api;
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   function libraryHasMixEdges(data) {

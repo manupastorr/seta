@@ -6,6 +6,7 @@
   <title>Seta 🍄</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="/static/playback.js"></script>
+  <script src="/static/renderSafe.js"></script>
   <script src="/static/mixLinks.js"></script>
   <style>
     :root {
@@ -78,7 +79,7 @@
     .filter-bar-groups {
       flex: 1 1 420px;
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px 12px;
       min-width: 0;
@@ -1693,16 +1694,6 @@
       pointer-events: none;
     }
 
-    .moment-label.below-view {
-      fill: rgba(30, 30, 45, 0.22);
-      font-size: 8px;
-    }
-
-    .moment-legend-label.below-view::before {
-      content: "↓ ";
-      color: var(--muted);
-    }
-
     .player-shortcuts-hint {
       margin-left: auto;
       font-size: 10px;
@@ -2915,13 +2906,10 @@
           .attr("filter", "url(#moment-blur)")
           .style("pointer-events", "none");
 
-        const labelText = belowView ? `↓ ${moment.label}` : moment.label;
-        let labelY = cy - ry - 5;
-        let labelClass = "moment-label";
-        if (belowView && (labelY > tickBandTop || cy > tickBandTop)) {
-          labelY = tickBandTop;
-          labelClass = "moment-label below-view";
-        }
+        if (belowView) return;
+        const labelText = moment.label;
+        const labelY = cy - ry - 5;
+        const labelClass = "moment-label";
         if (labelY < 12 || labelY > tickBandTop || cx < 28 || cx > plotWidth - 28) return;
 
         layer.append("text")
@@ -2948,7 +2936,7 @@
           <button type="button" class="bpm-reset moments-reset" title="Reset set zone filters" aria-label="Reset set zone filters"${filterOn ? "" : " disabled"}>↺</button>
         </div>
         <div class="legend-panel-body" id="moments-legend-body">
-          <span class="moments-legend-hint filter-hint">${filterOn ? "Showing tracks in selected zones" : "Click a zone to filter tracks"}</span>
+          ${filterOn ? `<span class="moments-legend-hint filter-hint">Showing selected zones</span>` : ""}
           <div class="moments-legend-grid"></div>
         </div>`;
       const grid = legend.querySelector(".moments-legend-grid");
@@ -2966,7 +2954,15 @@
           row.className = "moment-legend-item";
           row.classList.toggle("active", state.activeMoments.has(moment.id));
           row.dataset.momentId = moment.id;
-          row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label${momentBelowDisplayView(moment) ? " below-view" : ""}">${moment.label}</span>`;
+          const cloud = document.createElement("span");
+          cloud.className = "moment-cloud";
+          cloud.style.color = moment.color;
+          cloud.setAttribute("aria-hidden", "true");
+          cloud.textContent = "☁";
+          const label = document.createElement("span");
+          label.className = `moment-legend-label${momentBelowDisplayView(moment) ? " below-view" : ""}`;
+          label.textContent = moment.label;
+          row.append(cloud, label);
           grid.appendChild(row);
         });
       });
@@ -3174,15 +3170,16 @@
     }
 
     function searchResultItemHtml(track, index, { active = false, playing = false } = {}) {
-      const title = track.title || "Unknown title";
-      const artist = track.artist || "Unknown artist";
+      const title = SetaRenderSafe.html(track.title || "Unknown title");
+      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
+      const trackId = SetaRenderSafe.attr(track.id);
       const classes = [
         "neighbor-item",
         "search-result-item",
         active ? "is-active" : "",
         playing ? "is-playing" : "",
       ].filter(Boolean).join(" ");
-      return `<button type="button" class="${classes}" data-track-id="${track.id}" data-search-index="${index}" role="option" aria-selected="${active ? "true" : "false"}">
+      return `<button type="button" class="${classes}" data-track-id="${trackId}" data-search-index="${index}" role="option" aria-selected="${active ? "true" : "false"}">
         <span class="neighbor-main">
           <span class="neighbor-title">${title}</span>
           <span class="neighbor-artist">${artist}</span>
@@ -3452,7 +3449,7 @@
 
     function neighborTrackMetaHtml(track, score = null) {
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
-      const keyText = track.key || "?";
+      const keyText = SetaRenderSafe.html(track.key || "?");
       const keyColor = camelotColor(track.key);
       const statsRow = `<span class="neighbor-meta-row neighbor-meta-row-stats">
         <span class="tt-badge bpm neighbor-badge">${bpmVal}</span>
@@ -3474,11 +3471,12 @@
         "neighbor-item",
         playing ? "is-active" : "",
       ].filter(Boolean).join(" ");
-      const title = track.title || "Unknown title";
-      const artist = track.artist || "Unknown artist";
+      const title = SetaRenderSafe.html(track.title || "Unknown title");
+      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
+      const trackId = SetaRenderSafe.attr(track.id);
       return `
         <li>
-          <button type="button" class="${classes}" data-track-id="${track.id}" role="option" aria-selected="${playing ? "true" : "false"}">
+          <button type="button" class="${classes}" data-track-id="${trackId}" role="option" aria-selected="${playing ? "true" : "false"}">
             <span class="${rankClass}">${rankLabel}</span>
             <span class="neighbor-main">
               <span class="neighbor-title">${title}</span>
@@ -3768,7 +3766,7 @@
 
     function trackBadgeHtml(track) {
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : null;
-      const keyText = track.key || "?";
+      const keyText = SetaRenderSafe.html(track.key || "?");
       const keyColor = camelotColor(track.key);
       const energy = (track.energy ?? 0.5).toFixed(2);
       return `
@@ -3917,14 +3915,17 @@
 
       const meta = [track.genre, track.batch, track.duration_sec ? formatDuration(track.duration_sec) : null]
         .filter(Boolean)
-        .map(part => `<span>${part}</span>`)
+        .map(part => `<span>${SetaRenderSafe.html(part)}</span>`)
         .join("");
+      const title = SetaRenderSafe.html(track.title || "Unknown title");
+      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
+      const warning = SetaRenderSafe.html(warn);
 
       return `
-        <div class="tooltip-title">${track.title || "Unknown title"}</div>
-        <div class="tooltip-artist">${track.artist || "Unknown artist"}</div>
+        <div class="tooltip-title">${title}</div>
+        <div class="tooltip-artist">${artist}</div>
         <div class="tooltip-badges">${trackBadgeHtml(track)}</div>
-        ${warn ? `<div class="tooltip-warn">${warn}</div>` : ""}
+        ${warning ? `<div class="tooltip-warn">${warning}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
       `;
     }
@@ -4301,7 +4302,7 @@
           <button type="button" class="bpm-reset camelot-reset" title="Reset key filters" aria-label="Reset Camelot key filters"${filterOn ? "" : " disabled"}>↺</button>
         </div>
         <div class="legend-panel-body" id="legend-body">
-          <span class="legend-hint filter-hint">${filterOn ? "Showing selected keys" : "Click a key to filter tracks"}</span>
+          ${filterOn ? `<span class="legend-hint filter-hint">Showing selected keys</span>` : ""}
           <svg class="camelot-wheel" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-label="Camelot key wheel">
             ${svg}
           </svg>
