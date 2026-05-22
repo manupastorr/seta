@@ -48,34 +48,64 @@
       overflow: auto;
     }
 
+    .sidebar-header {
+      margin-bottom: 12px;
+    }
+
     h1 {
       margin: 0 0 4px;
-      font-size: 22px;
-      letter-spacing: -0.02em;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
     }
 
     .subtitle {
+      margin: 0;
       color: var(--muted);
-      margin-bottom: 6px;
       font-size: 12px;
+      line-height: 1.45;
     }
 
-    .stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 18px;
+    .library-status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--panel-border);
     }
 
-    .stat {
+    .status-item {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+      padding: 5px 9px;
+      border-radius: 999px;
       background: var(--panel);
       border: 1px solid var(--panel-border);
-      border-radius: 12px;
-      padding: 10px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.2;
+      white-space: nowrap;
     }
 
-    .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .stat-value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+    .status-item.is-primary {
+      background: var(--accent-soft);
+      border-color: rgba(107, 79, 216, 0.22);
+      color: var(--accent);
+    }
+
+    .status-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-item.is-primary .status-value {
+      color: var(--accent);
+    }
 
     label {
       display: block;
@@ -773,15 +803,12 @@
 <body>
   <div id="app">
     <aside>
-      <h1>Track Graph</h1>
-      <div class="subtitle">BPM × energy map · estimated mix hints</div>
+      <header class="sidebar-header">
+        <h1>Track Graph</h1>
+        <p class="subtitle">BPM × energy map · estimated mix hints</p>
+      </header>
 
-      <div class="stat-grid">
-        <div class="stat"><div class="stat-label">Visible</div><div class="stat-value" id="stat-visible">–</div></div>
-        <div class="stat"><div class="stat-label" id="stat-links-label">Mix pairs</div><div class="stat-value" id="stat-links">–</div></div>
-        <div class="stat"><div class="stat-label">Library</div><div class="stat-value" id="stat-library">–</div></div>
-        <div class="stat"><div class="stat-label">Curate</div><div class="stat-value" id="stat-curate">–</div></div>
-      </div>
+      <div class="library-status" id="library-status" aria-live="polite">–</div>
 
       <label for="search">Search</label>
       <input id="search" type="search" placeholder="Artist or title…" />
@@ -1543,24 +1570,33 @@
       state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
     }
 
-    function updateLinkStat(tracks, edges = visibleEdgeSet(tracks)) {
-      const linksLabel = document.getElementById("stat-links-label");
-      const linksValue = document.getElementById("stat-links");
+    function updateLibraryStatus(tracks) {
+      const el = document.getElementById("library-status");
+      if (!el || !state.data) return;
+      const library = state.data.tracks.filter(t => t.source === "tracks").length;
+      const curate = state.data.tracks.filter(t => t.source === "to_curate").length;
+      const items = [
+        { value: tracks.length, label: "visible", primary: true },
+        { value: library, label: "library" },
+        { value: curate, label: "curate" },
+      ];
       if (state.highlightNeighbors && state.selectedId) {
         const { list } = mixNeighbors(state.selectedId, tracks);
-        linksLabel.textContent = "Neighbors";
-        linksValue.textContent = list.length;
-        return;
+        items.push({
+          value: list.length,
+          label: list.length === 1 ? "neighbor" : "neighbors",
+          primary: true,
+        });
       }
-      linksLabel.textContent = "Mix pairs";
-      linksValue.textContent = edges.length;
+      el.innerHTML = items.map(item => `
+        <span class="status-item${item.primary ? " is-primary" : ""}">
+          <span class="status-value">${item.value}</span>
+          ${item.label}
+        </span>`).join("");
     }
 
-    function updateStats(tracks, edges) {
-      document.getElementById("stat-visible").textContent = tracks.length;
-      updateLinkStat(tracks, edges);
-      document.getElementById("stat-library").textContent = state.data.tracks.filter(t => t.source === "tracks").length;
-      document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
+    function updateStats(tracks) {
+      updateLibraryStatus(tracks);
     }
 
     function syncSourceFilterChips() {
@@ -1820,7 +1856,7 @@
       syncUiLayout();
       const tracks = filteredTracks();
       const edges = visibleEdgeSet(tracks);
-      updateStats(tracks, edges);
+      updateStats(tracks);
       rebuildPlayQueue(state.playingId || state.selectedId);
 
       d3.select("#graph").classed("is-over-node", false).classed("layout-explore", state.layout === "explore");
@@ -1979,7 +2015,7 @@
           link.style("opacity", state.highlightNeighbors ? 0 : 1);
         }
         updateMixLinks();
-        updateLinkStat(tracks, edges);
+        updateLibraryStatus(tracks);
         updateNeighborsButton(active, neighbors ? neighbors.size : 0);
 
         if (active && state.highlightNeighbors) {
