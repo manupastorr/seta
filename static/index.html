@@ -199,6 +199,45 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .filter-group-bpm .bpm-end-value {
+      padding: 0;
+      border: none;
+      background: none;
+      font: inherit;
+      color: inherit;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+
+    .filter-group-bpm .bpm-end-value:hover,
+    .filter-group-bpm .bpm-end-value:focus-visible {
+      color: var(--accent);
+      outline: none;
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .filter-group-bpm .bpm-end-input {
+      width: 2.75em;
+      padding: 0 2px;
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      background: #fff;
+      font: inherit;
+      font-size: inherit;
+      line-height: 1.2;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      -moz-appearance: textfield;
+    }
+
+    .filter-group-bpm .bpm-end-input::-webkit-outer-spin-button,
+    .filter-group-bpm .bpm-end-input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
     .filter-group-bpm .bpm-reset {
       flex: 0 0 22px;
       width: 22px;
@@ -1776,9 +1815,9 @@
               <label class="sr-only" for="bpm-max">Maximum BPM</label>
               <input id="bpm-max" type="range" min="70" max="180" value="180" />
             </div>
-            <div class="bpm-range-ends" aria-hidden="true">
-              <span id="bpm-min-label">70</span>
-              <span id="bpm-max-label">180</span>
+            <div class="bpm-range-ends">
+              <button type="button" class="bpm-end-value" id="bpm-min-label" aria-label="Minimum BPM, click to edit">70</button>
+              <button type="button" class="bpm-end-value" id="bpm-max-label" aria-label="Maximum BPM, click to edit">180</button>
             </div>
           </div>
         </div>
@@ -4552,8 +4591,10 @@
     }
 
     function updateBpmLabel() {
-      document.getElementById("bpm-min-label").textContent = String(state.bpmMin);
-      document.getElementById("bpm-max-label").textContent = String(state.bpmMax);
+      const minEl = document.getElementById("bpm-min-label");
+      const maxEl = document.getElementById("bpm-max-label");
+      if (minEl?.classList.contains("bpm-end-value")) minEl.textContent = String(state.bpmMin);
+      if (maxEl?.classList.contains("bpm-end-value")) maxEl.textContent = String(state.bpmMax);
       const lo = PLOT.bpmDomain[0];
       const hi = PLOT.bpmDomain[1];
       const span = hi - lo || 1;
@@ -4562,6 +4603,96 @@
       const fill = document.getElementById("bpm-range-fill");
       fill.style.left = `${left}%`;
       fill.style.width = `${width}%`;
+    }
+
+    let bpmLabelEditing = null;
+    let bpmLabelCanceling = false;
+
+    function finishBpmLabelEdit(which, value) {
+      bpmLabelEditing = null;
+      const id = which === "min" ? "bpm-min-label" : "bpm-max-label";
+      const el = document.getElementById(id);
+      if (!el) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bpm-end-value";
+      btn.id = id;
+      btn.setAttribute("aria-label", which === "min" ? "Minimum BPM, click to edit" : "Maximum BPM, click to edit");
+      btn.textContent = String(value);
+      el.replaceWith(btn);
+    }
+
+    function commitBpmLabelEdit(which, input) {
+      if (bpmLabelCanceling || !input?.isConnected) return;
+      const lo = PLOT.bpmDomain[0];
+      const hi = PLOT.bpmDomain[1];
+      let value = Math.round(Number(input.value));
+      if (!Number.isFinite(value)) {
+        value = which === "min" ? state.bpmMin : state.bpmMax;
+      }
+      value = Math.max(lo, Math.min(hi, value));
+      const minInput = document.getElementById("bpm-min");
+      const maxInput = document.getElementById("bpm-max");
+      if (which === "min") {
+        state.bpmMin = Math.min(value, state.bpmMax);
+        minInput.value = String(state.bpmMin);
+      } else {
+        state.bpmMax = Math.max(value, state.bpmMin);
+        maxInput.value = String(state.bpmMax);
+      }
+      finishBpmLabelEdit(which, which === "min" ? state.bpmMin : state.bpmMax);
+      updateBpmLabel();
+      updateBpmResetButton();
+      renderGraph();
+    }
+
+    function cancelBpmLabelEdit(which) {
+      bpmLabelCanceling = true;
+      finishBpmLabelEdit(which, which === "min" ? state.bpmMin : state.bpmMax);
+      bpmLabelCanceling = false;
+    }
+
+    function startBpmLabelEdit(which) {
+      if (bpmLabelEditing) return;
+      const id = which === "min" ? "bpm-min-label" : "bpm-max-label";
+      const btn = document.getElementById(id);
+      if (!btn?.classList.contains("bpm-end-value")) return;
+      bpmLabelEditing = which;
+      const current = which === "min" ? state.bpmMin : state.bpmMax;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.className = "bpm-end-input";
+      input.id = id;
+      input.min = String(PLOT.bpmDomain[0]);
+      input.max = String(PLOT.bpmDomain[1]);
+      input.step = "1";
+      input.inputMode = "numeric";
+      input.value = String(current);
+      input.setAttribute("aria-label", which === "min" ? "Minimum BPM" : "Maximum BPM");
+      input.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commitBpmLabelEdit(which, input);
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          cancelBpmLabelEdit(which);
+        }
+      });
+      input.addEventListener("blur", () => {
+        setTimeout(() => commitBpmLabelEdit(which, input), 0);
+      });
+      btn.replaceWith(input);
+      input.focus();
+      input.select();
+    }
+
+    function bindBpmLabelEditors() {
+      document.querySelector(".bpm-range-ends")?.addEventListener("click", e => {
+        const btn = e.target.closest(".bpm-end-value");
+        if (!btn) return;
+        startBpmLabelEdit(btn.id === "bpm-min-label" ? "min" : "max");
+      });
     }
 
     function updateBpmResetButton() {
@@ -4682,6 +4813,7 @@
         setBpmFromTrackClick(e.clientX);
       });
       document.getElementById("bpm-reset").addEventListener("click", resetBpmRange);
+      bindBpmLabelEditors();
       updateBpmLabel();
       updateBpmResetButton();
 
