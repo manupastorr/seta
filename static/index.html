@@ -1870,6 +1870,11 @@
       waveformCanvas.addEventListener("pointerup", () => { waveformScrubbing = false; });
       waveformCanvas.addEventListener("pointercancel", () => { waveformScrubbing = false; });
       waveformCanvas.addEventListener("keydown", (e) => {
+        if (e.code === "Space" || e.key === " ") {
+          e.preventDefault();
+          togglePlayPause();
+          return;
+        }
         if (!audio.src || !Number.isFinite(audio.duration)) return;
         const step = e.shiftKey ? 10 : 5;
         if (e.key === "ArrowRight") {
@@ -2998,6 +3003,19 @@
       updatePlayButton();
     }
 
+    function isTypingTarget(el) {
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+    }
+
+    function handleSpaceToggle(event) {
+      if (event.code !== "Space" && event.key !== " ") return;
+      if (isTypingTarget(event.target)) return;
+      event.preventDefault();
+      togglePlayPause();
+    }
+
     function playRelative(step) {
       syncPlayQueue();
       if (!state.playQueue.length) return;
@@ -3544,6 +3562,7 @@
       document.getElementById("play-btn").addEventListener("click", togglePlayPause);
       document.getElementById("prev-btn").addEventListener("click", () => playRelative(-1));
       document.getElementById("next-btn").addEventListener("click", () => playRelative(1));
+      document.addEventListener("keydown", handleSpaceToggle);
 
       setupWaveform();
       bindEllipsisTips();
