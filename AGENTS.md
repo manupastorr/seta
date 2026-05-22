@@ -46,6 +46,13 @@ After `./start.sh` has created `.venv` once:
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/test_playback.mjs
+node --test tests/test_mix_links.mjs tests/test_render_safe.mjs
+```
+
+Optional browser smoke test when the local server is running:
+
+```bash
+SETA_RUN_BROWSER_SMOKE=1 SETA_BASE_URL=http://127.0.0.1:8765 node --test tests/test_browser_smoke.mjs
 ```
 
 Covers scanner path rules, Camelot/mix scoring, play-queue navigation (`static/playback.js`), and optional sanity check against a local `library.json` if present.

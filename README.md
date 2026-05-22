@@ -121,6 +121,13 @@ From the repo root after `./start.sh` has created `.venv` once:
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/test_playback.mjs
+node --test tests/test_mix_links.mjs tests/test_render_safe.mjs
+```
+
+Optional browser smoke test against a running local server:
+
+```bash
+SETA_RUN_BROWSER_SMOKE=1 SETA_BASE_URL=http://127.0.0.1:8765 node --test tests/test_browser_smoke.mjs
 ```
 
 ## Scanner exclusions
