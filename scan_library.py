@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -112,8 +113,8 @@ def save_cache(cache: dict) -> None:
     CACHE_PATH.write_text(json.dumps(cache, indent=2))
 
 
-def analyze_if_needed(path: Path, cache: dict) -> dict:
-    from analyze import ANALYSIS_VERSION, analyze_track
+def cached_analysis(path: Path, cache: dict) -> dict | None:
+    from analyze import ANALYSIS_VERSION
 
     key = str(path.resolve())
     sig = file_sig(path)
@@ -125,6 +126,17 @@ def analyze_if_needed(path: Path, cache: dict) -> dict:
         and cached.get("analysis_version") == ANALYSIS_VERSION
     ):
         return cached
+    return None
+
+
+def analyze_if_needed(path: Path, cache: dict) -> dict:
+    from analyze import analyze_track
+
+    key = str(path.resolve())
+    cached = cached_analysis(path, cache)
+    if cached:
+        return cached
+    sig = file_sig(path)
 
     result = analyze_track(path)
     entry = {**sig, **result}
@@ -162,19 +174,62 @@ def build_edges(tracks: list[dict], min_score: float = 0.55, max_edges: int = 12
     return edges[:max_edges]
 
 
-def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -> dict:
-    files = discover_files(limit=limit)
-    print(f"Found {len(files)} audio files")
+def track_record(path: Path, analysis: dict) -> dict:
+    path_str = str(path.resolve())
+    meta = classify_path(path)
+    artist, title = parse_filename(path)
+    return {
+        "id": track_id(path),
+        "path": path_str,
+        "artist": artist,
+        "title": title,
+        "source": meta["source"],
+        "genre": meta["genre"],
+        "batch": meta["batch"],
+        "duration_sec": analysis.get("duration_sec"),
+        "bpm": analysis.get("bpm"),
+        "bpm_raw": analysis.get("bpm_raw"),
+        "bpm_octave_corrected": analysis.get("bpm_octave_corrected", False),
+        "bpm_source": analysis.get("bpm_source"),
+        "bpm_confidence": analysis.get("bpm_confidence"),
+        "key": analysis.get("key"),
+        "energy": analysis.get("energy", 0.5),
+        "vocals": analysis.get("vocals"),
+        "vocals_confidence": analysis.get("vocals_confidence"),
+        "analysis_error": analysis.get("analysis_error"),
+        **waveform_track_fields(analysis),
+    }
 
-    cache = load_cache()
+
+def scan_sequential(files: list[Path], cache: dict) -> list[dict]:
     tracks: list[dict] = []
+    for idx, path in enumerate(files, 1):
+        analysis = analyze_if_needed(path, cache)
+        if idx % 25 == 0 or idx == len(files):
+            print(f"  analyzed {idx}/{len(files)}")
+        tracks.append(track_record(path, analysis))
+    save_cache(cache)
+    return tracks
 
-    if workers > 1 and len(files) > 1:
-        path_strs = [str(p.resolve()) for p in files]
-        done = 0
-        results: dict[str, dict] = {}
+
+def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
+    pending: list[str] = []
+    results: dict[str, dict] = {}
+
+    for path in files:
+        path_str = str(path.resolve())
+        cached = cached_analysis(path, cache)
+        if cached:
+            results[path_str] = cached
+        else:
+            pending.append(path_str)
+
+    done = len(results)
+    if done:
+        print(f"  cached {done}/{len(files)}")
+    if pending:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(_analyze_worker, p) for p in path_strs]
+            futures = [pool.submit(_analyze_worker, p) for p in pending]
             for future in as_completed(futures):
                 path_str, sig, result = future.result()
                 entry = {**sig, **result}
@@ -183,66 +238,23 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                 done += 1
                 if done % 25 == 0 or done == len(files):
                     print(f"  analyzed {done}/{len(files)}")
-        save_cache(cache)
-        for path in files:
-            path_str = str(path.resolve())
-            analysis = results[path_str]
-            meta = classify_path(path)
-            artist, title = parse_filename(path)
-            tracks.append(
-                {
-                    "id": track_id(path),
-                    "path": path_str,
-                    "artist": artist,
-                    "title": title,
-                    "source": meta["source"],
-                    "genre": meta["genre"],
-                    "batch": meta["batch"],
-                    "duration_sec": analysis.get("duration_sec"),
-                    "bpm": analysis.get("bpm"),
-                    "bpm_raw": analysis.get("bpm_raw"),
-                    "bpm_octave_corrected": analysis.get("bpm_octave_corrected", False),
-                    "bpm_source": analysis.get("bpm_source"),
-                    "bpm_confidence": analysis.get("bpm_confidence"),
-                    "key": analysis.get("key"),
-                    "energy": analysis.get("energy", 0.5),
-                    "vocals": analysis.get("vocals"),
-                    "vocals_confidence": analysis.get("vocals_confidence"),
-                    "analysis_error": analysis.get("analysis_error"),
-                    **waveform_track_fields(analysis),
-                }
-            )
+    save_cache(cache)
+    return [track_record(path, results[str(path.resolve())]) for path in files]
+
+
+def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -> dict:
+    files = discover_files(limit=limit)
+    print(f"Found {len(files)} audio files")
+
+    cache = load_cache()
+    if workers > 1 and len(files) > 1:
+        try:
+            tracks = scan_parallel(files, cache, workers)
+        except BrokenProcessPool:
+            print("Parallel scan worker crashed; retrying with one worker.")
+            tracks = scan_sequential(files, cache)
     else:
-        for idx, path in enumerate(files, 1):
-            analysis = analyze_if_needed(path, cache)
-            if idx % 25 == 0 or idx == len(files):
-                print(f"  analyzed {idx}/{len(files)}")
-            meta = classify_path(path)
-            artist, title = parse_filename(path)
-            tracks.append(
-                {
-                    "id": track_id(path),
-                    "path": str(path.resolve()),
-                    "artist": artist,
-                    "title": title,
-                    "source": meta["source"],
-                    "genre": meta["genre"],
-                    "batch": meta["batch"],
-                    "duration_sec": analysis.get("duration_sec"),
-                    "bpm": analysis.get("bpm"),
-                    "bpm_raw": analysis.get("bpm_raw"),
-                    "bpm_octave_corrected": analysis.get("bpm_octave_corrected", False),
-                    "bpm_source": analysis.get("bpm_source"),
-                    "bpm_confidence": analysis.get("bpm_confidence"),
-                    "key": analysis.get("key"),
-                    "energy": analysis.get("energy", 0.5),
-                    "vocals": analysis.get("vocals"),
-                    "vocals_confidence": analysis.get("vocals_confidence"),
-                    "analysis_error": analysis.get("analysis_error"),
-                    **waveform_track_fields(analysis),
-                }
-            )
-        save_cache(cache)
+        tracks = scan_sequential(files, cache)
 
     tracks.sort(key=lambda t: (t["source"], t["genre"], t["artist"].lower(), t["title"].lower()))
 

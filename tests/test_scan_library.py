@@ -11,6 +11,7 @@ from unittest.mock import patch
 import scan_library
 from scan_library import (
     build_edges,
+    cached_analysis,
     classify_path,
     discover_files,
     is_scannable_audio,
@@ -228,6 +229,24 @@ class TrackIdTests(unittest.TestCase):
             path = Path(fh.name)
             self.assertEqual(track_id(path), track_id(path))
             self.assertEqual(len(track_id(path)), 16)
+
+
+class CacheTests(unittest.TestCase):
+    def test_cached_analysis_requires_current_file_signature_and_version(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".wav") as fh:
+            path = Path(fh.name)
+            sig = scan_library.file_sig(path)
+            cache = {
+                str(path.resolve()): {
+                    **sig,
+                    "analysis_version": 999,
+                    "bpm": 123,
+                }
+            }
+            with patch("analyze.ANALYSIS_VERSION", 999):
+                self.assertEqual(cached_analysis(path, cache)["bpm"], 123)
+            with patch("analyze.ANALYSIS_VERSION", 1000):
+                self.assertIsNone(cached_analysis(path, cache))
 
 
 class BuildEdgesTests(unittest.TestCase):
