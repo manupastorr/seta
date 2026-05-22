@@ -359,22 +359,34 @@
     .chip {
       border: 1px solid var(--panel-border);
       background: var(--panel);
-      color: var(--text);
+      color: var(--muted);
       border-radius: 999px;
       padding: 5px 8px;
       font-size: 11px;
+      font-weight: 500;
       line-height: 1.2;
       cursor: pointer;
-      transition: 0.15s ease;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
       min-width: 0;
       text-align: center;
     }
 
-    .chip.active {
-      background: rgba(0, 0, 0, 0.05);
+    .chip:hover:not(.active) {
+      background: rgba(0, 0, 0, 0.04);
       border-color: rgba(0, 0, 0, 0.14);
       color: var(--text);
+    }
+
+    .chip.active {
+      background: var(--accent-soft);
+      border-color: rgba(107, 79, 216, 0.32);
+      color: var(--accent);
       font-weight: 600;
+    }
+
+    .chip.active:hover {
+      background: rgba(107, 79, 216, 0.17);
+      border-color: rgba(107, 79, 216, 0.42);
     }
 
     .player {
