@@ -193,6 +193,8 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                     "bpm_confidence": analysis.get("bpm_confidence"),
                     "key": analysis.get("key"),
                     "energy": analysis.get("energy", 0.5),
+                    "vocals": analysis.get("vocals"),
+                    "vocals_confidence": analysis.get("vocals_confidence"),
                     "analysis_error": analysis.get("analysis_error"),
                 }
             )
@@ -220,6 +222,8 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                     "bpm_confidence": analysis.get("bpm_confidence"),
                     "key": analysis.get("key"),
                     "energy": analysis.get("energy", 0.5),
+                    "vocals": analysis.get("vocals"),
+                    "vocals_confidence": analysis.get("vocals_confidence"),
                     "analysis_error": analysis.get("analysis_error"),
                 }
             )

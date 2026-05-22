@@ -12,7 +12,7 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 6
+ANALYSIS_VERSION = 7
 BPM_MIN = 70.0
 BPM_MAX = 180.0
 BPM_MAP_MIN = 70.0
@@ -355,6 +355,67 @@ def _detect_bpm(
     return bpm, round(raw_bpm, 1), octave_fixed, onset_env, candidates
 
 
+def _clip01(value: float) -> float:
+    return float(np.clip(value, 0.0, 1.0))
+
+
+def _detect_vocals(y: np.ndarray, sr: int) -> tuple[str, float | None]:
+    """Heuristic vocal presence: yes, no, or unclear, plus confidence in that label."""
+    if len(y) < sr * 8:
+        return "unclear", None
+
+    y_harm, y_perc = librosa.effects.hpss(y, margin=2.0)
+    harm_rms = float(np.sqrt(np.mean(y_harm**2)))
+    perc_rms = float(np.sqrt(np.mean(y_perc**2)))
+    harm_ratio = harm_rms / (harm_rms + perc_rms + 1e-9)
+
+    mel = librosa.feature.melspectrogram(y=y_harm, sr=sr, n_mels=48, fmax=6000)
+    mel_db = librosa.power_to_db(mel, ref=np.max)
+    mel_mean = np.mean(mel_db, axis=1)
+    vocal_band = float(np.mean(mel_mean[5:28]))
+    edge_band = float(np.mean(np.concatenate([mel_mean[:5], mel_mean[28:]])))
+    vocal_contrast = vocal_band - edge_band
+
+    try:
+        _, _, voiced_probs = librosa.pyin(
+            y_harm,
+            fmin=librosa.note_to_hz("C2"),
+            fmax=librosa.note_to_hz("C5"),
+            sr=sr,
+            fill_na=0.0,
+        )
+        voiced_strength = (
+            float(np.nanmean(voiced_probs)) if voiced_probs is not None else 0.0
+        )
+    except Exception:
+        voiced_strength = 0.0
+
+    flatness = librosa.feature.spectral_flatness(y=y_harm)[0]
+    tonal_harm = _clip01(1.0 - float(np.mean(flatness)) * 10.0)
+
+    vocal_score = (
+        0.28 * _clip01((harm_ratio - 0.52) / 0.22)
+        + 0.28 * _clip01((vocal_contrast - 1.5) / 4.0)
+        + 0.30 * _clip01((voiced_strength - 0.12) / 0.28)
+        + 0.14 * tonal_harm
+    )
+    inst_score = (
+        0.40 * _clip01((0.48 - harm_ratio) / 0.18)
+        + 0.35 * _clip01((0.08 - voiced_strength) / 0.08)
+        + 0.25 * _clip01((2.0 - vocal_contrast) / 2.0)
+    )
+
+    if vocal_score >= 0.52 and vocal_score >= inst_score + 0.12:
+        conf = _clip01(0.45 + (vocal_score - 0.52) * 1.1)
+        return "yes", round(conf, 3)
+    if inst_score >= 0.50 and inst_score >= vocal_score + 0.12:
+        conf = _clip01(0.45 + (inst_score - 0.50) * 1.1)
+        return "no", round(conf, 3)
+    spread = abs(vocal_score - inst_score)
+    conf = round(_clip01(0.35 + spread * 0.5), 3)
+    return "unclear", conf
+
+
 def _detect_energy(y: np.ndarray, sr: int) -> float:
     if len(y) < sr:
         return 0.5
@@ -404,9 +465,12 @@ def analyze_track(path: Path) -> dict:
             "bpm_confidence": None,
             "key": None,
             "energy": 0.5,
+            "vocals": "unclear",
+            "vocals_confidence": None,
             "analysis_error": str(exc),
         }
 
+    vocals, vocals_confidence = _detect_vocals(y, sr)
     bpm, bpm_raw, bpm_octave_corrected, onset_env, tempo_candidates = _detect_bpm(y, sr)
     bpm_source = "analysis"
 
@@ -429,5 +493,7 @@ def analyze_track(path: Path) -> dict:
         "bpm_confidence": bpm_confidence,
         "key": _detect_key(y, sr)[0],
         "energy": _detect_energy(y, sr),
+        "vocals": vocals,
+        "vocals_confidence": vocals_confidence,
         "analysis_error": None,
     }

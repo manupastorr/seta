@@ -66,7 +66,9 @@ Unified resolver in `analyze.py` (see `ANALYSIS_VERSION`):
 2. **Tagged 68–92 BPM** — half-time tag zone; double only when librosa also anchors ~140–165 BPM (peak techno) or ambiguous raw + close margin. Organic/cumbia tags stay slow.
 3. **No tag** — score librosa octave candidates; prefer primary tempo when a half-time octave was picked; lift obvious psy/techno false halves (~72 → ~140 when scores are close). Prefer half-time when librosa primary is ~155–180 but onset favours ~78–95 (downtempo/organic).
 
-UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confidence`
+UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confidence`, `vocals`, `vocals_confidence`
+
+`vocals` is heuristic (`yes` / `no` / `unclear`) from harmonic mid-band + pitch voicing on the analysis window — not speech recognition. Show the player badge only when `vocals_confidence` ≥ 0.55.
 
 Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 

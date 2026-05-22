@@ -37,6 +37,8 @@ REQUIRED_TRACK_FIELDS = {
     "analysis_error",
 }
 
+OPTIONAL_TRACK_FIELDS = {"vocals", "vocals_confidence"}
+
 
 def library_errors(library: dict) -> list[str]:
     """Return structural problems in a generated library payload."""
@@ -65,6 +67,17 @@ def library_errors(library: dict) -> list[str]:
         source = track.get("source")
         if source not in {"tracks", "to_curate", "other"}:
             errors.append(f"tracks[{idx}] unexpected source: {source!r}")
+
+        vocals = track.get("vocals")
+        if vocals is not None and vocals not in {"yes", "no", "unclear"}:
+            errors.append(f"tracks[{idx}] unexpected vocals: {vocals!r}")
+        vocals_conf = track.get("vocals_confidence")
+        if vocals_conf is not None and not isinstance(vocals_conf, (int, float)):
+            errors.append(f"tracks[{idx}] vocals_confidence must be numeric")
+        elif isinstance(vocals_conf, (int, float)) and (
+            vocals_conf < 0 or vocals_conf > 1
+        ):
+            errors.append(f"tracks[{idx}] vocals_confidence out of range: {vocals_conf}")
 
     edges = library.get("edges")
     if not isinstance(edges, list):
@@ -288,6 +301,8 @@ class LibrarySanityTests(unittest.TestCase):
             "bpm_confidence": 0.35,
             "key": "8A",
             "energy": 0.7,
+            "vocals": "unclear",
+            "vocals_confidence": 0.42,
             "analysis_error": None,
         }
 
