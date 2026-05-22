@@ -1887,6 +1887,8 @@
     const ELLIPSIS_TIP_SHOW_MS = 100;
     const ELLIPSIS_TIP_SELECTOR = ".player-title, .player-artist, .neighbor-title, .neighbor-artist";
 
+    const FILTER_STORAGE_KEY = "track-graph-filters-v1";
+
     const SHORTCUT_GROUPS = [
       {
         title: "Playback",
@@ -3211,6 +3213,54 @@
       tryPlaySingleSearchResult();
     }
 
+    function filterStateSnapshot() {
+      return {
+        activeMoments: [...state.activeMoments],
+        activeKeys: [...state.activeKeys],
+        genre: state.genre,
+        bpmMin: state.bpmMin,
+        bpmMax: state.bpmMax,
+        sources: [...state.sources],
+        search: state.search,
+      };
+    }
+
+    function persistFilterState() {
+      try {
+        sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filterStateSnapshot()));
+      } catch (_) {}
+    }
+
+    function restoreFilterState() {
+      try {
+        const raw = sessionStorage.getItem(FILTER_STORAGE_KEY);
+        if (!raw) return false;
+        const saved = JSON.parse(raw);
+        state.activeMoments = new Set(Array.isArray(saved.activeMoments) ? saved.activeMoments : []);
+        state.activeKeys = new Set(Array.isArray(saved.activeKeys) ? saved.activeKeys : []);
+        state.genre = saved.genre || "all";
+        state.bpmMin = Number(saved.bpmMin ?? PLOT.bpmDomain[0]);
+        state.bpmMax = Number(saved.bpmMax ?? PLOT.bpmDomain[1]);
+        state.sources = new Set(Array.isArray(saved.sources) && saved.sources.length
+          ? saved.sources
+          : ["tracks", "to_curate"]);
+        state.search = saved.search || "";
+        const searchEl = document.getElementById("search");
+        const genreEl = document.getElementById("genre");
+        if (searchEl) searchEl.value = state.search;
+        if (genreEl) genreEl.value = state.genre;
+        document.getElementById("bpm-min").value = String(state.bpmMin);
+        document.getElementById("bpm-max").value = String(state.bpmMax);
+        syncSourceFilterChips();
+        updateBpmLabel();
+        updateBpmResetButton();
+        state.viewFilterSignature = null;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     function syncFilterSummary() {
       const wrap = document.getElementById("filter-summary");
       const textEl = document.getElementById("filter-summary-text");
@@ -3798,6 +3848,7 @@
         .filter(Boolean)
         .map(part => `<span>${part}</span>`)
         .join("");
+      const soundeoUrl = soundeoSearchUrl(track);
 
       return `
         <div class="tooltip-title">${track.title || "Unknown title"}</div>
@@ -3805,6 +3856,7 @@
         <div class="tooltip-badges">${trackBadgeHtml(track)}</div>
         ${warn ? `<div class="tooltip-warn">${warn}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
+        ${soundeoUrl ? `<a class="tooltip-link" href="${soundeoUrl}" target="_blank" rel="noopener noreferrer">Search on Soundeo</a>` : ""}
       `;
     }
 
@@ -4268,6 +4320,7 @@
       const tracks = filteredTracks();
       updateNeighborList(tracks);
       syncUiLayout();
+      syncFilterSummary();
       if (state.hoveredId && !tracks.some(t => t.id === state.hoveredId)) {
         state.hoveredId = null;
         tooltip.style.opacity = 0;
@@ -4479,6 +4532,7 @@
       maybeAutoFitViewForFilters(tracks, simulation);
 
       updateSearchResults(tracks);
+      persistFilterState();
     }
 
     function resetView(animate = true) {
@@ -4586,6 +4640,7 @@
       state.data = await res.json();
       state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
       populateGenres(state.data.tracks);
+      restoreFilterState();
       renderGraph();
 
       document.getElementById("search").addEventListener("input", e => {
