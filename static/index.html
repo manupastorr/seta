@@ -233,7 +233,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      padding: 12px 11px;
+      padding: 10px 8px;
       border: 1px solid var(--panel-border);
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.75);
@@ -257,7 +257,7 @@
       width: max-content;
       min-width: 0;
       max-width: 248px;
-      padding: 10px 11px;
+      padding: 8px;
     }
 
     .mix-dock.is-chrome:not(.is-visible) .neighbor-panel-body,
@@ -390,13 +390,18 @@
       gap: 2px;
     }
 
+    .neighbor-list > li {
+      margin: 0;
+      padding: 0;
+    }
+
     .neighbor-item {
       display: grid;
-      grid-template-columns: 18px minmax(0, 1fr) auto;
-      gap: 6px 8px;
+      grid-template-columns: 14px minmax(0, 1fr) 46px;
+      gap: 4px 5px;
       align-items: center;
       width: 100%;
-      padding: 7px 8px;
+      padding: 6px 4px;
       border: none;
       border-radius: 8px;
       background: transparent;
@@ -412,7 +417,7 @@
 
     .neighbor-item.is-active {
       background: var(--accent-soft);
-      box-shadow: inset 3px 0 0 var(--accent);
+      box-shadow: inset 2px 0 0 var(--accent);
     }
 
     .neighbor-item.is-active:hover {
@@ -426,16 +431,17 @@
     }
 
     .neighbor-rank {
-      font-size: 10px;
+      font-size: 9px;
       color: var(--muted);
       font-variant-numeric: tabular-nums;
       text-align: center;
+      line-height: 1;
     }
 
     .neighbor-rank.is-dot {
       display: inline-block;
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: var(--accent);
       margin: 0 auto;
@@ -466,17 +472,37 @@
     }
 
     .neighbor-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 2px;
+      flex-shrink: 0;
+      width: 46px;
+    }
+
+    .neighbor-meta-row {
       display: inline-flex;
-      flex-wrap: nowrap;
       align-items: center;
       justify-content: flex-end;
-      gap: 4px;
-      flex-shrink: 0;
+      gap: 3px;
+      width: 100%;
+    }
+
+    .neighbor-meta-row-score {
+      min-height: 14px;
+    }
+
+    .neighbor-meta--anchor {
+      justify-content: center;
     }
 
     .neighbor-meta .neighbor-badge {
-      padding: 2px 6px;
-      font-size: 9px;
+      padding: 1px 4px;
+      font-size: 8px;
+      line-height: 1.15;
+      font-weight: 600;
+      letter-spacing: 0;
     }
 
     .neighbor-empty {
@@ -2951,14 +2977,17 @@
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
       const keyText = track.key || "?";
       const keyColor = camelotColor(track.key);
-      const badges = [
-        `<span class="tt-badge bpm neighbor-badge">${bpmVal}</span>`,
-        `<span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>`,
-      ];
-      if (score != null) {
-        badges.push(`<span class="tt-badge mix-score neighbor-badge">${Math.round(score * 100)}%</span>`);
+      const statsRow = `<span class="neighbor-meta-row neighbor-meta-row-stats">
+        <span class="tt-badge bpm neighbor-badge">${bpmVal}</span>
+        <span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
+      </span>`;
+      if (score == null) {
+        return `<span class="neighbor-meta neighbor-meta--anchor">${statsRow}</span>`;
       }
-      return `<span class="neighbor-meta">${badges.join("")}</span>`;
+      const scoreRow = `<span class="neighbor-meta-row neighbor-meta-row-score">
+        <span class="tt-badge mix-score neighbor-badge">${Math.round(score * 100)}%</span>
+      </span>`;
+      return `<span class="neighbor-meta">${scoreRow}${statsRow}</span>`;
     }
 
     function neighborListItemHtml(track, { anchor = false, rank = null, score = null, playing = false } = {}) {
