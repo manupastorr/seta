@@ -456,16 +456,31 @@
       line-height: 1;
     }
 
-    .seek-wrap {
+    .waveform-wrap {
       display: grid;
       grid-template-columns: 1fr;
       gap: 4px;
-      margin-bottom: 10px;
+      margin-bottom: 2px;
     }
 
-    .seek-wrap input[type="range"] {
+    #waveform {
       width: 100%;
-      accent-color: var(--accent);
+      height: 48px;
+      display: block;
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: none;
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .waveform-wrap.is-loading #waveform {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    .waveform-wrap.is-empty #waveform {
+      cursor: default;
+      opacity: 0.55;
     }
 
     .time-row {
@@ -1022,8 +1037,8 @@
           <button class="icon transport-main" id="play-btn" title="Play / Pause">▶</button>
           <button class="secondary icon" id="next-btn" title="Next in filtered list">▶|</button>
         </div>
-        <div class="seek-wrap">
-          <input id="seek" type="range" min="0" max="1000" value="0" disabled />
+        <div class="waveform-wrap is-empty" id="waveform-wrap">
+          <canvas id="waveform" width="240" height="48" role="slider" aria-label="Waveform seek" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="0" tabindex="0"></canvas>
           <div class="time-row">
             <span id="time-current">0:00</span>
             <span id="time-total">0:00</span>
@@ -1120,8 +1135,340 @@
     };
 
     const audio = document.getElementById("audio");
-    const seek = document.getElementById("seek");
+    const waveformCanvas = document.getElementById("waveform");
+    const waveformWrap = document.getElementById("waveform-wrap");
     const tooltip = document.getElementById("tooltip");
+
+    const WAVEFORM_BARS = 200;
+    const WAVEFORM_CACHE_MAX = 24;
+    const WAVEFORM_CACHE_VERSION = 2;
+    const SERATO_BAND = {
+      low: [211, 47, 47],
+      mid: [67, 160, 71],
+      high: [30, 136, 229],
+    };
+    const peakCache = new Map();
+    let waveformData = null;
+    let waveformTrackId = null;
+    let waveformLoading = false;
+    let waveformLoadGen = 0;
+    let waveformScrubbing = false;
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    async function resumeAudioContext() {
+      const ctx = getAudioContext();
+      if (ctx.state === "suspended") await ctx.resume();
+    }
+
+    function waveformUiColors() {
+      const root = getComputedStyle(document.documentElement);
+      return {
+        bg: "rgba(0, 0, 0, 0.04)",
+        playhead: root.getPropertyValue("--text").trim() || "#1a1a24",
+      };
+    }
+
+    function seratoBandRgb(low, mid, high) {
+      const sum = low + mid + high || 1;
+      const lr = low / sum;
+      const mr = mid / sum;
+      const hr = high / sum;
+      const r = SERATO_BAND.low[0] * lr + SERATO_BAND.mid[0] * mr + SERATO_BAND.high[0] * hr;
+      const g = SERATO_BAND.low[1] * lr + SERATO_BAND.mid[1] * mr + SERATO_BAND.high[1] * hr;
+      const b = SERATO_BAND.low[2] * lr + SERATO_BAND.mid[2] * mr + SERATO_BAND.high[2] * hr;
+      return { r: r | 0, g: g | 0, b: b | 0 };
+    }
+
+    function resizeWaveformCanvas() {
+      const rect = waveformCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.max(1, Math.floor(rect.width * dpr));
+      const h = Math.max(1, Math.floor(48 * dpr));
+      if (waveformCanvas.width !== w || waveformCanvas.height !== h) {
+        waveformCanvas.width = w;
+        waveformCanvas.height = h;
+      }
+      return dpr;
+    }
+
+    function computeColoredPeaks(audioBuffer, barCount) {
+      const ch0 = audioBuffer.getChannelData(0);
+      const ch1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
+      const len = ch0.length;
+      const sr = audioBuffer.sampleRate;
+      const perBar = Math.max(1, Math.floor(len / barCount));
+      const peak = new Float32Array(barCount);
+      const low = new Float32Array(barCount);
+      const mid = new Float32Array(barCount);
+      const high = new Float32Array(barCount);
+      const alphaLow = 1 - Math.exp((-2 * Math.PI * 280) / sr);
+      const alphaHigh = 1 - Math.exp((-2 * Math.PI * 4200) / sr);
+      let lp = 0;
+      let hp = 0;
+
+      for (let j = 0; j < len; j++) {
+        const bar = Math.min(barCount - 1, Math.floor(j / perBar));
+        const x = ch1 ? (ch0[j] + ch1[j]) * 0.5 : ch0[j];
+        peak[bar] += x * x;
+
+        lp += alphaLow * (x - lp);
+        hp += alphaHigh * (x - hp);
+        const lowSig = lp;
+        const highSig = x - hp;
+        const midSig = x - lowSig - highSig;
+
+        low[bar] += lowSig * lowSig;
+        mid[bar] += midSig * midSig;
+        high[bar] += highSig * highSig;
+      }
+
+      for (let i = 0; i < barCount; i++) {
+        const n = Math.min(perBar, len - i * perBar);
+        peak[i] = Math.sqrt(peak[i] / n);
+        low[i] = Math.sqrt(low[i] / n);
+        mid[i] = Math.sqrt(mid[i] / n);
+        high[i] = Math.sqrt(high[i] / n);
+      }
+      normalizeWaveformDisplay(peak);
+      let topBand = 0;
+      for (let i = 0; i < barCount; i++) {
+        const mix = low[i] + mid[i] + high[i];
+        if (mix > topBand) topBand = mix;
+      }
+      if (topBand > 0) {
+        for (let i = 0; i < barCount; i++) {
+          low[i] /= topBand;
+          mid[i] /= topBand;
+          high[i] /= topBand;
+        }
+      }
+      return { v: WAVEFORM_CACHE_VERSION, peak, low, mid, high };
+    }
+
+    function normalizeWaveformDisplay(values) {
+      const sorted = Array.from(values).sort((a, b) => a - b);
+      const n = sorted.length;
+      if (!n) return;
+      const p5 = sorted[Math.floor(n * 0.05)] ?? sorted[0];
+      const p95 = sorted[Math.floor(n * 0.95)] ?? sorted[n - 1];
+      const range = Math.max(p95 - p5, 1e-6);
+      const floor = 0.05;
+      const gamma = 0.62;
+
+      for (let i = 0; i < values.length; i++) {
+        let v = (values[i] - p5) / range;
+        v = Math.max(0, Math.min(1, v));
+        v = Math.pow(v, gamma);
+        values[i] = floor + v * (1 - floor);
+      }
+    }
+
+    function trimPeakCache() {
+      while (peakCache.size > WAVEFORM_CACHE_MAX) {
+        const oldest = peakCache.keys().next().value;
+        peakCache.delete(oldest);
+      }
+    }
+
+    function drawColoredBar(ctx, x, centerY, barW, amp, low, mid, high, alpha) {
+      if (amp <= 0) return;
+      const { r, g, b } = seratoBandRgb(low, mid, high);
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      ctx.fillRect(x, centerY - amp, barW, amp * 2);
+    }
+
+    function drawPlaceholderWaveform(ctx, w, h, dpr, loading) {
+      const bars = WAVEFORM_BARS;
+      const gap = Math.max(1, dpr);
+      const barW = Math.max(1, (w - gap * (bars - 1)) / bars);
+      const mid = h / 2;
+      for (let i = 0; i < bars; i++) {
+        const x = i * (barW + gap);
+        const amp = (loading ? 0.08 + 0.12 * Math.abs(Math.sin(i * 0.31)) : 0.06) * (h * 0.38);
+        const phase = i * 0.17;
+        drawColoredBar(
+          ctx,
+          x,
+          mid,
+          barW,
+          amp,
+          0.45 + 0.35 * Math.abs(Math.sin(phase)),
+          0.35 + 0.3 * Math.abs(Math.sin(phase + 1.2)),
+          0.25 + 0.35 * Math.abs(Math.sin(phase + 2.4)),
+          loading ? 0.42 : 0.28
+        );
+      }
+    }
+
+    function getWaveformProgress() {
+      const total = audio.duration;
+      if (!Number.isFinite(total) || total <= 0) return 0;
+      return Math.min(1, Math.max(0, audio.currentTime / total));
+    }
+
+    function drawWaveform(progress) {
+      const dpr = resizeWaveformCanvas();
+      const ctx = waveformCanvas.getContext("2d");
+      const w = waveformCanvas.width;
+      const h = waveformCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const ui = waveformUiColors();
+      ctx.fillStyle = ui.bg;
+      ctx.fillRect(0, 0, w, h);
+
+      if (!waveformData) {
+        drawPlaceholderWaveform(ctx, w, h, dpr, waveformLoading);
+        return;
+      }
+
+      const bars = waveformData.peak.length;
+      const gap = Math.max(1, dpr);
+      const barW = Math.max(1, (w - gap * (bars - 1)) / bars);
+      const mid = h / 2;
+      const playedX = progress * w;
+
+      for (let i = 0; i < bars; i++) {
+        const x = i * (barW + gap);
+        const amp = waveformData.peak[i] * (h * 0.46);
+        const played = x + barW * 0.5 <= playedX;
+        drawColoredBar(
+          ctx,
+          x,
+          mid,
+          barW,
+          amp,
+          waveformData.low[i],
+          waveformData.mid[i],
+          waveformData.high[i],
+          played ? 0.95 : 0.34
+        );
+      }
+
+      if (progress > 0 && progress < 1) {
+        ctx.strokeStyle = ui.playhead;
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = Math.max(1, dpr * 1.5);
+        ctx.beginPath();
+        ctx.moveTo(playedX + 0.5, 0);
+        ctx.lineTo(playedX + 0.5, h);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function syncWaveformAria(progress) {
+      const now = Math.round(progress * 1000);
+      waveformCanvas.setAttribute("aria-valuenow", String(now));
+      waveformCanvas.setAttribute("aria-valuetext", `${document.getElementById("time-current").textContent} of ${document.getElementById("time-total").textContent}`);
+    }
+
+    async function ensureWaveform(trackId) {
+      const gen = ++waveformLoadGen;
+      waveformTrackId = trackId;
+
+      if (peakCache.has(trackId)) {
+        const cached = peakCache.get(trackId);
+        if (cached?.v !== WAVEFORM_CACHE_VERSION) {
+          peakCache.delete(trackId);
+        } else {
+          waveformData = cached;
+          waveformWrap.classList.remove("is-loading", "is-empty");
+          drawWaveform(getWaveformProgress());
+          return;
+        }
+      }
+
+      waveformData = null;
+      waveformLoading = true;
+      waveformWrap.classList.add("is-loading");
+      waveformWrap.classList.remove("is-empty");
+      drawWaveform(0);
+
+      try {
+        const res = await fetch(`/api/audio/${encodeURIComponent(trackId)}`);
+        if (!res.ok) throw new Error(`audio fetch ${res.status}`);
+        const buf = await res.arrayBuffer();
+        if (gen !== waveformLoadGen || state.playingId !== trackId) return;
+        await resumeAudioContext();
+        const decoded = await getAudioContext().decodeAudioData(buf.slice(0));
+        if (gen !== waveformLoadGen || state.playingId !== trackId) return;
+        const data = computeColoredPeaks(decoded, WAVEFORM_BARS);
+        peakCache.set(trackId, data);
+        trimPeakCache();
+        waveformData = data;
+      } catch (err) {
+        console.warn("waveform decode failed", err);
+        if (gen === waveformLoadGen && state.playingId === trackId) {
+          waveformData = null;
+        }
+      } finally {
+        if (gen === waveformLoadGen) {
+          waveformLoading = false;
+          waveformWrap.classList.remove("is-loading");
+          drawWaveform(getWaveformProgress());
+        }
+      }
+    }
+
+    function clearWaveform() {
+      waveformLoadGen += 1;
+      waveformData = null;
+      waveformTrackId = null;
+      waveformLoading = false;
+      waveformWrap.classList.add("is-empty");
+      waveformWrap.classList.remove("is-loading");
+      drawWaveform(0);
+    }
+
+    function seekFromWaveformClientX(clientX) {
+      const total = audio.duration;
+      if (!Number.isFinite(total) || total <= 0) return;
+      const rect = waveformCanvas.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      audio.currentTime = ratio * total;
+      updateSeekUi();
+    }
+
+    function setupWaveform() {
+      const ro = new ResizeObserver(() => drawWaveform(getWaveformProgress()));
+      ro.observe(waveformWrap);
+
+      waveformCanvas.addEventListener("pointerdown", (e) => {
+        if (!audio.src || waveformWrap.classList.contains("is-empty")) return;
+        resumeAudioContext().catch(() => {});
+        waveformScrubbing = true;
+        waveformCanvas.setPointerCapture(e.pointerId);
+        seekFromWaveformClientX(e.clientX);
+      });
+      waveformCanvas.addEventListener("pointermove", (e) => {
+        if (!waveformScrubbing) return;
+        seekFromWaveformClientX(e.clientX);
+      });
+      waveformCanvas.addEventListener("pointerup", () => { waveformScrubbing = false; });
+      waveformCanvas.addEventListener("pointercancel", () => { waveformScrubbing = false; });
+      waveformCanvas.addEventListener("keydown", (e) => {
+        if (!audio.src || !Number.isFinite(audio.duration)) return;
+        const step = e.shiftKey ? 10 : 5;
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          audio.currentTime = Math.min(audio.duration, audio.currentTime + step);
+          updateSeekUi();
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          audio.currentTime = Math.max(0, audio.currentTime - step);
+          updateSeekUi();
+        }
+      });
+      drawWaveform(0);
+    }
 
     function camelotColor(key) {
       return CAMELOT_COLORS[key] || "#555770";
@@ -1847,16 +2194,17 @@
       const total = audio.duration;
       const current = audio.currentTime;
       if (!Number.isFinite(total) || total <= 0) {
-        seek.disabled = true;
-        seek.value = 0;
         document.getElementById("time-current").textContent = "0:00";
         document.getElementById("time-total").textContent = "0:00";
+        drawWaveform(0);
+        syncWaveformAria(0);
         return;
       }
-      seek.disabled = false;
-      seek.value = Math.round((current / total) * 1000);
       document.getElementById("time-current").textContent = formatDuration(current);
       document.getElementById("time-total").textContent = formatDuration(total);
+      const progress = current / total;
+      drawWaveform(progress);
+      syncWaveformAria(progress);
     }
 
     function formatBpm(track) {
@@ -1893,6 +2241,10 @@
       document.getElementById("now-badges").innerHTML = "";
       document.getElementById("now-note").hidden = true;
       document.getElementById("now-note").textContent = "";
+      audio.removeAttribute("src");
+      audio.load();
+      clearWaveform();
+      updateSeekUi();
     }
 
     function updatePlayerTrack(track, note) {
@@ -1957,9 +2309,13 @@
       state.selectedId = track.id;
       state.playingId = track.id;
       updatePlayerTrack(track);
+      waveformWrap.classList.remove("is-empty");
       audio.src = `/api/audio/${track.id}`;
+      ensureWaveform(track.id);
+      resumeAudioContext().catch(() => {});
       if (autoplay) audio.play().catch(() => {});
       updatePlayButton();
+      updateSeekUi();
       state.refreshHighlight?.();
     }
 
@@ -2532,11 +2888,7 @@
       document.getElementById("prev-btn").addEventListener("click", () => playRelative(-1));
       document.getElementById("next-btn").addEventListener("click", () => playRelative(1));
 
-      seek.addEventListener("input", () => {
-        if (!Number.isFinite(audio.duration)) return;
-        audio.currentTime = (Number(seek.value) / 1000) * audio.duration;
-        updateSeekUi();
-      });
+      setupWaveform();
       audio.addEventListener("timeupdate", updateSeekUi);
       audio.addEventListener("loadedmetadata", updateSeekUi);
       audio.addEventListener("play", updatePlayButton);
