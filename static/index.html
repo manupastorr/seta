@@ -2526,8 +2526,15 @@
       tooltip.innerHTML = buildTrackTooltip(hovered);
     }
 
+    function clearQueueFocusHighlight() {
+      if (state.queueFocusIndex < 0) return;
+      state.queueFocusIndex = -1;
+      neighborQueueItems().forEach(el => el.classList.remove("is-queue-focus"));
+    }
+
     function tryPlayTrackAt(event) {
       if (state.pointerDragged || !state.viewport) return;
+      clearQueueFocusHighlight();
       if (event.clientX < mixDockWidth() + 8) return;
       const [px, py] = d3.pointer(event, state.viewport.node());
       const { plotWidth, plotHeight } = plotSize();
