@@ -33,7 +33,7 @@
       --player-height: 72px;
       display: grid;
       grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr var(--player-height);
+      grid-template-rows: 1fr;
       height: 100vh;
       position: relative;
       --ui-left: 18px;
@@ -43,14 +43,16 @@
     .filter-bar {
       grid-row: 1;
       grid-column: 1;
+      align-self: start;
       z-index: 5;
       display: flex;
       align-items: flex-start;
       gap: 14px 18px;
       padding: 10px 14px 11px;
-      border-bottom: 1px solid var(--panel-border);
-      background: rgba(255, 255, 255, 0.97);
-      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(226, 226, 234, 0.75);
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
     }
 
@@ -213,10 +215,11 @@
     }
 
     .workspace {
-      grid-row: 2;
+      grid-row: 1;
       grid-column: 1;
       position: relative;
       min-height: 0;
+      height: 100%;
       overflow: hidden;
     }
 
@@ -233,7 +236,7 @@
       padding: 12px 11px;
       border: 1px solid var(--panel-border);
       border-radius: 14px;
-      background: rgba(255, 255, 255, 0.97);
+      background: rgba(255, 255, 255, 0.75);
       backdrop-filter: blur(14px);
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
       opacity: 0;
@@ -704,15 +707,17 @@
 
     .player-dock {
       grid-column: 1;
-      grid-row: 3;
+      grid-row: 1;
+      align-self: end;
       z-index: 6;
       display: flex;
       align-items: center;
       min-height: var(--player-height);
       padding: 7px 14px 9px;
-      border-top: 1px solid var(--panel-border);
-      background: rgba(255, 255, 255, 0.97);
-      backdrop-filter: blur(14px);
+      border-top: 1px solid rgba(226, 226, 234, 0.75);
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.06);
       pointer-events: auto;
     }
@@ -1120,23 +1125,27 @@
       filter: none;
     }
 
-    .legend {
-      --camelot-panel-body-height: 228px;
-      --camelot-bottom-gap: 46px;
-      position: absolute;
-      right: 18px;
-      top: calc(100% - var(--camelot-bottom-gap) - var(--camelot-panel-body-height));
-      bottom: auto;
-      width: 196px;
-      max-width: 196px;
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
+    .legend,
+    .moments-legend {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 226, 234, 0.75);
       border-radius: 14px;
-      padding: 8px 10px 10px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
       z-index: 4;
       pointer-events: auto;
       overflow: hidden;
+    }
+
+    .legend {
+      position: absolute;
+      right: 18px;
+      bottom: calc(var(--player-height, 72px) + 10px);
+      top: auto;
+      width: 196px;
+      max-width: 196px;
+      padding: 8px 10px 10px;
     }
 
     .legend-panel-header {
@@ -1401,17 +1410,12 @@
     .moments-legend {
       position: absolute;
       right: 18px;
-      top: 18px;
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      border-radius: 14px;
+      top: calc(var(--filter-bar-height, 88px) + 10px);
+      max-height: calc(100% - var(--filter-bar-height, 88px) - var(--player-height, 72px) - 270px);
       padding: 8px 10px;
       width: 196px;
       max-width: 196px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-      z-index: 4;
-      pointer-events: auto;
-      overflow: hidden;
+      overflow-y: auto;
     }
 
     .moments-legend-title {
@@ -2167,6 +2171,7 @@
       const screen = trackScreenPoint(node);
       if (!screen) return false;
       if (screen.x < mixDockWidth() + 8) return true;
+      if (screen.y < filterBarHeight() + 8) return true;
       return screen.y > window.innerHeight - playerDockHeight() - 10;
     }
 
@@ -2319,15 +2324,17 @@
 
     function plotSize() {
       const width = document.getElementById("app").clientWidth;
-      const height = Math.max(200, window.innerHeight - playerDockHeight() - filterBarHeight());
+      const height = Math.max(200, window.innerHeight);
+      const bottomChrome = playerDockHeight() + 10;
       const plotLeft = mixDockWidth() + PLOT.margin.left;
       const plotWidth = Math.max(120, width - plotLeft - PLOT.margin.right);
+      const plotHeight = Math.max(120, height - PLOT.margin.top - PLOT.margin.bottom - bottomChrome);
       return {
         width,
         height,
         plotLeft,
         plotWidth,
-        plotHeight: height - PLOT.margin.top - PLOT.margin.bottom
+        plotHeight
       };
     }
 
@@ -2546,7 +2553,7 @@
 
     function syncAxisTickLabels(transform = state.zoomTransform) {
       if (!state.axisTickLayer) return;
-      const { plotLeft, plotWidth, plotHeight } = plotSize();
+      const { width, height, plotLeft, plotWidth, plotHeight } = plotSize();
       const x = bpmScale(plotWidth);
       const y = energyScale(plotHeight);
       const bpmY = PLOT.margin.top + plotHeight + 18;
@@ -2554,6 +2561,7 @@
       const maxX = plotLeft + plotWidth + 8;
       const minY = PLOT.margin.top - 8;
       const maxY = PLOT.margin.top + plotHeight + 8;
+      const maxBpmY = height - playerDockHeight() - 8;
       const bpmTicks = d3.range(PLOT.bpmDomain[0], PLOT.bpmDomain[1] + 1, 20);
       const energyTicks = [0, 0.5, 1];
       const intensityX = plotLeft - 12;
@@ -2564,7 +2572,7 @@
         .join("text")
         .attr("class", "tick-label bpm-tick-label")
         .attr("text-anchor", "middle")
-        .attr("y", bpmY)
+        .attr("y", Math.min(bpmY, maxBpmY))
         .attr("x", bpm => transform.x + x(bpm) * transform.k)
         .attr("opacity", bpm => {
           const screenX = transform.x + x(bpm) * transform.k;
