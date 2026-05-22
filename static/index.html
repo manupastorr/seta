@@ -453,6 +453,10 @@
       pointer-events: none;
     }
 
+    .axis-label-y {
+      font-size: 10px;
+    }
+
     .grid-line {
       stroke: rgba(0, 0, 0, 0.035);
       stroke-width: 0.5;
@@ -868,7 +872,7 @@
     <aside>
       <header class="sidebar-header">
         <h1>Track Graph</h1>
-        <p class="subtitle">BPM × energy map · estimated mix hints</p>
+        <p class="subtitle">BPM × intensity map · estimated mix hints</p>
       </header>
 
       <div class="library-status" id="library-status" aria-live="polite">–</div>
@@ -933,7 +937,7 @@
 
     <main id="main">
       <div class="topbar">
-        <div class="pill" id="view-hint">Scroll to zoom in · drag empty space to pan · BPM × energy grid stays fixed</div>
+        <div class="pill" id="view-hint">Scroll to zoom in · drag empty space to pan · BPM × intensity grid stays fixed</div>
       </div>
       <div class="legend" id="legend"></div>
       <div class="moments-legend" id="moments-legend" hidden></div>
@@ -962,7 +966,7 @@
     const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5 };
 
     const PLOT = {
-      margin: { top: 44, right: 36, bottom: 52, left: 52 },
+      margin: { top: 44, right: 36, bottom: 52, left: 64 },
       inset: { left: 52, right: 36, top: 52, bottom: 40 },
       bpmDomain: [70, 180],
       energyDomain: [0, 1]
@@ -1004,7 +1008,7 @@
       prevLayout: "mix",
       viewport: null,
       axisLayer: null,
-      bpmTickLayer: null,
+      axisTickLayer: null,
       svg: null,
       plotWidth: 0,
       plotHeight: 0,
@@ -1428,41 +1432,50 @@
           .attr("class", "grid-line major")
           .attr("x1", 0).attr("x2", plotWidth)
           .attr("y1", py).attr("y2", py);
-        grid.append("text")
-          .attr("class", "tick-label")
-          .attr("x", -8)
-          .attr("y", py + 3)
-          .attr("text-anchor", "end")
-          .text(e.toFixed(1));
       }
     }
 
-    function syncBpmTickLabels(transform = state.zoomTransform) {
-      if (!state.bpmTickLayer) return;
+    function syncAxisTickLabels(transform = state.zoomTransform) {
+      if (!state.axisTickLayer) return;
       const { plotLeft, plotWidth, plotHeight } = plotSize();
       const x = bpmScale(plotWidth);
-      const yPos = PLOT.margin.top + plotHeight + 18;
+      const y = energyScale(plotHeight);
+      const bpmY = PLOT.margin.top + plotHeight + 18;
       const minX = plotLeft - 8;
       const maxX = plotLeft + plotWidth + 8;
-      const ticks = d3.range(
-        PLOT.bpmDomain[0],
-        PLOT.bpmDomain[1] + 1,
-        20
-      );
+      const minY = PLOT.margin.top - 8;
+      const maxY = PLOT.margin.top + plotHeight + 8;
+      const bpmTicks = d3.range(PLOT.bpmDomain[0], PLOT.bpmDomain[1] + 1, 20);
+      const energyTicks = [0, 0.5, 1];
+      const intensityX = plotLeft - 12;
 
-      const layer = state.bpmTickLayer.selectAll(".bpm-ticks").data([null]).join("g").attr("class", "bpm-ticks");
-      layer.selectAll("text")
-        .data(ticks)
+      const bpmLayer = state.axisTickLayer.selectAll(".bpm-ticks").data([null]).join("g").attr("class", "bpm-ticks");
+      bpmLayer.selectAll("text")
+        .data(bpmTicks)
         .join("text")
         .attr("class", "tick-label bpm-tick-label")
         .attr("text-anchor", "middle")
-        .attr("y", yPos)
+        .attr("y", bpmY)
         .attr("x", bpm => transform.x + x(bpm) * transform.k)
         .attr("opacity", bpm => {
           const screenX = transform.x + x(bpm) * transform.k;
           return screenX >= minX && screenX <= maxX ? 1 : 0;
         })
         .text(d => d);
+
+      const energyLayer = state.axisTickLayer.selectAll(".energy-ticks").data([null]).join("g").attr("class", "energy-ticks");
+      energyLayer.selectAll("text")
+        .data(energyTicks)
+        .join("text")
+        .attr("class", "tick-label energy-tick-label")
+        .attr("text-anchor", "end")
+        .attr("x", intensityX)
+        .attr("y", e => transform.y + y(e) * transform.k + 3)
+        .attr("opacity", e => {
+          const screenY = transform.y + y(e) * transform.k;
+          return screenY >= minY && screenY <= maxY ? 1 : 0;
+        })
+        .text(e => e.toFixed(1));
     }
 
     function drawAxisLabels(layer, plotLeft, plotWidth, plotHeight) {
@@ -1474,14 +1487,15 @@
         .attr("y", PLOT.margin.top + plotHeight + 40)
         .attr("text-anchor", "middle")
         .text("BPM →");
+      const intensityLabelX = plotLeft - 34;
       titles.append("text")
-        .attr("class", "axis-label")
-        .attr("x", plotLeft - 36)
+        .attr("class", "axis-label axis-label-y")
+        .attr("x", intensityLabelX)
         .attr("y", PLOT.margin.top + plotHeight / 2)
-        .attr("transform", `rotate(-90 ${plotLeft - 36} ${PLOT.margin.top + plotHeight / 2})`)
+        .attr("transform", `rotate(-90 ${intensityLabelX} ${PLOT.margin.top + plotHeight / 2})`)
         .attr("text-anchor", "middle")
-        .text("Energy →");
-      syncBpmTickLabels(state.zoomTransform);
+        .text("Intensity (est.) →");
+      syncAxisTickLabels(state.zoomTransform);
     }
 
     function clampTransform(transform, plotLeft, plotWidth, plotHeight, layout = state.layout) {
@@ -1766,7 +1780,7 @@
         <div class="tooltip-badges">
           <span class="tt-badge bpm">${bpmVal != null ? bpmVal : "?"} BPM</span>
           <span class="tt-badge key" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
-          <span class="tt-badge energy">E ${energy}</span>
+          <span class="tt-badge energy" title="Estimated intensity (0–1)">Int ${energy}</span>
         </div>
         ${warn ? `<div class="tooltip-warn">${warn}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
@@ -1955,7 +1969,7 @@
           const next = clampTransform(event.transform, plotLeft, plotWidth, plotHeight, state.layout);
           state.zoomTransform = next;
           viewport.attr("transform", next);
-          syncBpmTickLabels(next);
+          syncAxisTickLabels(next);
           if (!shouldShowLoupe()) hideLoupe();
         });
       svg.call(state.zoomBehavior);
@@ -1987,7 +2001,7 @@
 
         state.axisLayer = svg.append("g").attr("class", "axis-layer");
         state.viewport = svg.append("g").attr("class", "viewport");
-        state.bpmTickLayer = svg.append("g").attr("class", "bpm-tick-layer");
+        state.axisTickLayer = svg.append("g").attr("class", "axis-tick-layer");
         ensureMomentDefs(svg);
         state.zoomTransform = clampTransform(
           d3.zoomIdentity.translate(plotLeft, PLOT.margin.top),
@@ -2406,7 +2420,7 @@
         state.svg = null;
         state.viewport = null;
         state.axisLayer = null;
-        state.bpmTickLayer = null;
+        state.axisTickLayer = null;
         state.zoomBehavior = null;
         renderGraph();
       });
