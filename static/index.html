@@ -305,15 +305,56 @@
       gap: 5px;
     }
 
-    #source-filters,
-    #layout-modes {
+    #source-filters {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 5px;
     }
 
-    #layout-modes {
+    #view-controls {
+      display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    #view-controls #moments-toggle {
+      grid-column: 1 / -1;
+    }
+
+    .sidebar-section-map {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--panel-border);
+    }
+
+    .sidebar-hint {
+      margin: 8px 0 0;
+      font-size: 10px;
+      line-height: 1.35;
+      color: var(--muted);
+    }
+
+    .sidebar-hint-filters {
+      margin-top: 6px;
+    }
+
+    .sidebar-section-map label {
+      margin-top: 0;
+    }
+
+    .map-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .map-actions button {
+      width: 100%;
+      min-width: 0;
+      padding: 7px 8px;
+      font-size: 11px;
+      line-height: 1.2;
     }
 
     .chip {
@@ -397,19 +438,16 @@
       color: var(--muted);
     }
 
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 6px;
-      align-items: stretch;
+    .map-actions button.active,
+    #neighbors-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
-    .controls button {
-      width: 100%;
-      min-width: 0;
-      padding: 7px 8px;
-      font-size: 11px;
-      line-height: 1.2;
+    #neighbors-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
     button {
@@ -608,17 +646,6 @@
       stroke: var(--accent);
       stroke-width: 1.25px;
       filter: none;
-    }
-
-    #neighbors-btn.active {
-      background: var(--accent-soft);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    #neighbors-btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
     }
 
     .legend {
@@ -916,8 +943,8 @@
       <label>Source</label>
       <div class="chip-row" id="source-filters">
         <button class="chip active" data-source="all">All</button>
-        <button class="chip active" data-source="tracks">Library</button>
-        <button class="chip active" data-source="to_curate">Curate</button>
+        <button class="chip" data-source="tracks">Library</button>
+        <button class="chip" data-source="to_curate">Curate</button>
       </div>
 
       <label for="genre">Genre / batch</label>
@@ -932,16 +959,20 @@
         <input id="bpm-min" type="range" min="70" max="180" value="70" />
         <input id="bpm-max" type="range" min="70" max="180" value="180" />
       </div>
+      <p class="sidebar-hint sidebar-hint-filters">Search, source, genre, and BPM filter here.</p>
 
-      <label>Layout</label>
-      <div class="chip-row" id="layout-modes">
-        <button class="chip active" data-layout="mix">Mix map</button>
-        <button class="chip" data-layout="explore">Explore</button>
-      </div>
-
-      <label>Map overlays</label>
-      <div class="chip-row" id="overlay-toggles">
-        <button class="chip active" id="moments-toggle">Set moments</button>
+      <div class="sidebar-section sidebar-section-map">
+        <label>Map</label>
+        <div class="chip-row" id="view-controls">
+          <button class="chip active" data-layout="mix">Mix map</button>
+          <button class="chip" data-layout="explore">Explore</button>
+          <button class="chip active" id="moments-toggle">Set moments</button>
+        </div>
+        <div class="map-actions">
+          <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
+          <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
+        </div>
+        <p class="sidebar-hint">Camelot keys filter on the map wheel (bottom right).</p>
       </div>
 
       <div class="player">
@@ -959,10 +990,6 @@
             <span id="time-current">0:00</span>
             <span id="time-total">0:00</span>
           </div>
-        </div>
-        <div class="controls">
-          <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
-          <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
         <audio id="audio" preload="metadata"></audio>
       </div>
@@ -1750,7 +1777,10 @@
       const both = state.sources.has("tracks") && state.sources.has("to_curate");
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
         const src = chip.dataset.source;
-        chip.classList.toggle("active", src === "all" ? both : state.sources.has(src));
+        const active = src === "all"
+          ? both
+          : state.sources.size === 1 && state.sources.has(src);
+        chip.classList.toggle("active", active);
       });
     }
 
@@ -2351,22 +2381,17 @@
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
         chip.addEventListener("click", () => {
           const src = chip.dataset.source;
-          if (src === "all") {
-            const both = state.sources.has("tracks") && state.sources.has("to_curate");
-            state.sources = both ? new Set() : new Set(["tracks", "to_curate"]);
-          } else if (state.sources.has(src)) {
-            state.sources.delete(src);
-          } else {
-            state.sources.add(src);
-          }
+          state.sources = src === "all"
+            ? new Set(["tracks", "to_curate"])
+            : new Set([src]);
           syncSourceFilterChips();
           renderGraph();
         });
       });
 
-      document.querySelectorAll("#layout-modes .chip").forEach(chip => {
+      document.querySelectorAll("#view-controls .chip[data-layout]").forEach(chip => {
         chip.addEventListener("click", () => {
-          document.querySelectorAll("#layout-modes .chip").forEach(c => c.classList.remove("active"));
+          document.querySelectorAll("#view-controls .chip[data-layout]").forEach(c => c.classList.remove("active"));
           chip.classList.add("active");
           state.layout = chip.dataset.layout;
           renderGraph();
