@@ -226,8 +226,8 @@
     .mix-dock {
       position: absolute;
       left: 10px;
-      top: 10px;
-      bottom: 10px;
+      top: calc(var(--filter-bar-height, 88px) + 10px);
+      bottom: calc(var(--player-height, 72px) + 10px);
       width: 248px;
       z-index: 4;
       display: flex;
@@ -338,8 +338,10 @@
       flex: 1 1 0;
       min-height: 0;
       overflow-y: auto;
+      overscroll-behavior: contain;
       margin: 0;
-      padding: 0;
+      padding: 2px 0 6px;
+      scroll-padding-block: 4px;
       list-style: none;
       display: flex;
       flex-direction: column;
