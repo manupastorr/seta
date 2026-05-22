@@ -1508,6 +1508,24 @@
       content: " · ";
     }
 
+    .tooltip-link,
+    .player-soundeo-link {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .tooltip-link:hover,
+    .player-soundeo-link:hover {
+      text-decoration: underline;
+    }
+
+    .player-soundeo-link {
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+
     .topbar {
       position: absolute;
       left: var(--ui-left);
@@ -3848,7 +3866,6 @@
         .filter(Boolean)
         .map(part => `<span>${part}</span>`)
         .join("");
-      const soundeoUrl = soundeoSearchUrl(track);
 
       return `
         <div class="tooltip-title">${track.title || "Unknown title"}</div>
@@ -3856,7 +3873,6 @@
         <div class="tooltip-badges">${trackBadgeHtml(track)}</div>
         ${warn ? `<div class="tooltip-warn">${warn}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
-        ${soundeoUrl ? `<a class="tooltip-link" href="${soundeoUrl}" target="_blank" rel="noopener noreferrer">Search on Soundeo</a>` : ""}
       `;
     }
 
