@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""Scan tracks + To Curate, analyze audio, build library.json for the graph UI."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime, timezone
+from pathlib import Path
+
+from analyze import analyze_track
+from camelot import mix_score
+
+GRAPH_DIR = Path(__file__).resolve().parent
+TRACKS_ROOT = Path.home() / "Music" / "tracks"
+CURATE_ROOT = Path.home() / "Downloads" / "To Curate"
+CACHE_PATH = GRAPH_DIR / "cache.json"
+LIBRARY_PATH = GRAPH_DIR / "library.json"
+AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}
+
+
+def parse_filename(path: Path) -> tuple[str, str]:
+    stem = path.stem
+    if " - " in stem:
+        artist, title = stem.split(" - ", 1)
+        return artist.strip(), title.strip()
+    return "", stem.strip()
+
+
+def classify_path(path: Path) -> dict:
+    path = path.resolve()
+    if path.is_relative_to(TRACKS_ROOT):
+        rel = path.relative_to(TRACKS_ROOT)
+        parts = rel.parts
+        return {
+            "source": "tracks",
+            "genre": parts[0] if len(parts) > 1 else "Unknown",
+            "batch": None,
+        }
+    if path.is_relative_to(CURATE_ROOT):
+        rel = path.relative_to(CURATE_ROOT)
+        parts = rel.parts
+        return {
+            "source": "to_curate",
+            "genre": parts[0] if len(parts) > 1 else "Uncategorized",
+            "batch": parts[0] if len(parts) > 1 else None,
+        }
+    return {"source": "other", "genre": "Other", "batch": None}
+
+
+def track_id(path: Path) -> str:
+    return hashlib.sha1(str(path.resolve()).encode()).hexdigest()[:16]
+
+
+def file_sig(path: Path) -> dict:
+    stat = path.stat()
+    return {"mtime": int(stat.st_mtime), "size": stat.st_size}
+
+
+def load_cache() -> dict:
+    if CACHE_PATH.exists():
+        return json.loads(CACHE_PATH.read_text())
+    return {}
+
+
+def save_cache(cache: dict) -> None:
+    CACHE_PATH.write_text(json.dumps(cache, indent=2))
+
+
+def analyze_if_needed(path: Path, cache: dict) -> dict:
+    key = str(path.resolve())
+    sig = file_sig(path)
+    cached = cache.get(key)
+    if cached and cached.get("mtime") == sig["mtime"] and cached.get("size") == sig["size"]:
+        return cached
+
+    result = analyze_track(path)
+    entry = {**sig, **result}
+    cache[key] = entry
+    return entry
+
+
+def _analyze_worker(path_str: str) -> tuple[str, dict, dict]:
+    path = Path(path_str)
+    sig = file_sig(path)
+    result = analyze_track(path)
+    return path_str, sig, result
+
+
+def discover_files(limit: int | None = None) -> list[Path]:
+    files: list[Path] = []
+    for root in (TRACKS_ROOT, CURATE_ROOT):
+        if not root.exists():
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            if "tools" in Path(dirpath).parts:
+                continue
+            for name in filenames:
+                if Path(name).suffix.lower() in AUDIO_EXTS:
+                    files.append(Path(dirpath) / name)
+    files.sort()
+    if limit:
+        files = files[:limit]
+    return files
+
+
+def build_edges(tracks: list[dict], min_score: float = 0.55, max_edges: int = 12000) -> list[dict]:
+    edges: list[dict] = []
+    for i, a in enumerate(tracks):
+        if a.get("bpm") is None or not a.get("key"):
+            continue
+        for b in tracks[i + 1 :]:
+            if b.get("bpm") is None or not b.get("key"):
+                continue
+            score = mix_score(a["key"], b["key"], a["bpm"], b["bpm"])
+            if score >= min_score:
+                edges.append(
+                    {
+                        "source": a["id"],
+                        "target": b["id"],
+                        "score": round(score, 3),
+                    }
+                )
+    edges.sort(key=lambda e: e["score"], reverse=True)
+    return edges[:max_edges]
+
+
+def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -> dict:
+    files = discover_files(limit=limit)
+    print(f"Found {len(files)} audio files")
+
+    cache = load_cache()
+    tracks: list[dict] = []
+
+    if workers > 1 and len(files) > 1:
+        path_strs = [str(p.resolve()) for p in files]
+        done = 0
+        results: dict[str, dict] = {}
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(_analyze_worker, p) for p in path_strs]
+            for future in as_completed(futures):
+                path_str, sig, result = future.result()
+                entry = {**sig, **result}
+                cache[path_str] = entry
+                results[path_str] = entry
+                done += 1
+                if done % 25 == 0 or done == len(files):
+                    print(f"  analyzed {done}/{len(files)}")
+        save_cache(cache)
+        for path in files:
+            path_str = str(path.resolve())
+            analysis = results[path_str]
+            meta = classify_path(path)
+            artist, title = parse_filename(path)
+            tracks.append(
+                {
+                    "id": track_id(path),
+                    "path": path_str,
+                    "artist": artist,
+                    "title": title,
+                    "source": meta["source"],
+                    "genre": meta["genre"],
+                    "batch": meta["batch"],
+                    "duration_sec": analysis.get("duration_sec"),
+                    "bpm": analysis.get("bpm"),
+                    "key": analysis.get("key"),
+                    "energy": analysis.get("energy", 0.5),
+                    "analysis_error": analysis.get("analysis_error"),
+                }
+            )
+    else:
+        for idx, path in enumerate(files, 1):
+            analysis = analyze_if_needed(path, cache)
+            if idx % 25 == 0 or idx == len(files):
+                print(f"  analyzed {idx}/{len(files)}")
+            meta = classify_path(path)
+            artist, title = parse_filename(path)
+            tracks.append(
+                {
+                    "id": track_id(path),
+                    "path": str(path.resolve()),
+                    "artist": artist,
+                    "title": title,
+                    "source": meta["source"],
+                    "genre": meta["genre"],
+                    "batch": meta["batch"],
+                    "duration_sec": analysis.get("duration_sec"),
+                    "bpm": analysis.get("bpm"),
+                    "key": analysis.get("key"),
+                    "energy": analysis.get("energy", 0.5),
+                    "analysis_error": analysis.get("analysis_error"),
+                }
+            )
+        save_cache(cache)
+
+    tracks.sort(key=lambda t: (t["source"], t["genre"], t["artist"].lower(), t["title"].lower()))
+
+    library = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "tracks_root": str(TRACKS_ROOT),
+        "curate_root": str(CURATE_ROOT),
+        "track_count": len(tracks),
+        "tracks": tracks,
+        "edges": [] if skip_edges else build_edges(tracks),
+    }
+    LIBRARY_PATH.write_text(json.dumps(library, indent=2))
+    print(f"Wrote {LIBRARY_PATH} ({len(tracks)} tracks, {len(library['edges'])} edges)")
+    return library
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Scan DJ library for graph view")
+    parser.add_argument("--limit", type=int, default=None, help="Only scan first N files")
+    parser.add_argument("--workers", type=int, default=max(2, os.cpu_count() or 4) - 1)
+    parser.add_argument("--skip-edges", action="store_true")
+    args = parser.parse_args()
+    scan(limit=args.limit, workers=args.workers, skip_edges=args.skip_edges)
+
+
+if __name__ == "__main__":
+    main()

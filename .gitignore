@@ -1,0 +1,24 @@
+# Generated scan output (rebuilt locally)
+library.json
+cache.json
+scan.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Audio & playlists (not part of this app)
+*.wav
+*.aiff
+*.aif
+*.flac
+*.mp3
+*.m3u8
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

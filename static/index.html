@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #f5f5f8;
+      --panel-border: #e2e2ea;
+      --text: #1a1a24;
+      --muted: #6b6b80;
+      --accent: #6b4fd8;
+      --accent-soft: rgba(107, 79, 216, 0.12);
+      --curate: #d48806;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+    }
+
+    aside {
+      border-right: 1px solid var(--panel-border);
+      background: var(--bg);
+      padding: 20px 18px;
+      overflow: auto;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 18px;
+      font-size: 12px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 14px 0 6px;
+    }
+
+    input[type="search"], select, input[type="range"] {
+      width: 100%;
+    }
+
+    input[type="search"], select {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      border: 1px solid var(--panel-border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    .chip.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .player {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+    }
+
+    .player-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .player-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button.secondary {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+    }
+
+    #main {
+      position: relative;
+      background: var(--bg);
+    }
+
+    svg {
+      width: 100%;
+      height: 100vh;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    svg.is-panning {
+      cursor: grabbing;
+    }
+
+    .axis-label {
+      fill: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .link {
+      stroke: rgba(80, 80, 120, 0.12);
+      stroke-width: 1;
+    }
+
+    .link.highlight {
+      stroke: rgba(107, 79, 216, 0.55);
+      stroke-width: 1.6;
+    }
+
+    .node circle.core {
+      stroke-width: 2px;
+      cursor: pointer;
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.15));
+    }
+
+    .node.selected circle.core {
+      stroke: #1a1a24;
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 10px rgba(107, 79, 216, 0.5));
+    }
+
+    .node.to-curate circle.core {
+      stroke-dasharray: 4 3;
+    }
+
+    .node.dim circle.core {
+      opacity: 0.1;
+    }
+
+    .node.neighbor circle.core {
+      stroke: var(--accent);
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 8px rgba(107, 79, 216, 0.45));
+    }
+
+    #neighbors-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    #neighbors-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .legend {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 12px;
+      max-height: 220px;
+      overflow: auto;
+      width: 150px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      margin-bottom: 5px;
+      color: var(--muted);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      max-width: 280px;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      z-index: 5;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .tooltip strong { display: block; margin-bottom: 4px; }
+    .tooltip .row { color: var(--muted); }
+
+    .topbar {
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      display: flex;
+      gap: 8px;
+      z-index: 4;
+    }
+
+    .pill {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <h1>Track Graph</h1>
+      <div class="subtitle">BPM × energy map with Camelot mix links</div>
+
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-label">Visible</div><div class="stat-value" id="stat-visible">–</div></div>
+        <div class="stat"><div class="stat-label">Links</div><div class="stat-value" id="stat-links">–</div></div>
+        <div class="stat"><div class="stat-label">Library</div><div class="stat-value" id="stat-library">–</div></div>
+        <div class="stat"><div class="stat-label">Curate</div><div class="stat-value" id="stat-curate">–</div></div>
+      </div>
+
+      <label for="search">Search</label>
+      <input id="search" type="search" placeholder="Artist or title…" />
+
+      <label>Source</label>
+      <div class="chip-row" id="source-filters">
+        <button class="chip active" data-source="all">All</button>
+        <button class="chip active" data-source="tracks">Library</button>
+        <button class="chip active" data-source="to_curate">To Curate</button>
+      </div>
+
+      <label for="genre">Genre / batch</label>
+      <select id="genre"><option value="all">All genres</option></select>
+
+      <label>BPM range <span id="bpm-label"></span></label>
+      <input id="bpm-min" type="range" min="80" max="180" value="80" />
+      <input id="bpm-max" type="range" min="80" max="180" value="180" />
+
+      <label>Layout</label>
+      <div class="chip-row" id="layout-modes">
+        <button class="chip active" data-layout="mix">Mix map</button>
+        <button class="chip" data-layout="explore">Explore</button>
+      </div>
+
+      <div class="player">
+        <div class="player-title" id="now-title">Nothing playing</div>
+        <div class="player-meta" id="now-meta">Click a node to preview</div>
+        <div class="controls">
+          <button id="play-btn">Play</button>
+          <button class="secondary" id="neighbors-btn">Mix neighbors</button>
+          <button class="secondary" id="reset-view-btn">Reset view</button>
+        </div>
+        <audio id="audio" preload="none"></audio>
+      </div>
+    </aside>
+
+    <main id="main">
+      <div class="topbar">
+        <div class="pill">Scroll to zoom · drag background to pan · drag nodes to reposition</div>
+        <div class="pill">Dashed ring = To Curate</div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="tooltip" id="tooltip"></div>
+      <svg id="graph"></svg>
+    </main>
+  </div>
+
+  <script>
+    const CAMELOT_COLORS = {
+      "1A": "#C62828", "1B": "#EF5350", "2A": "#E65100", "2B": "#FF9800",
+      "3A": "#F57F17", "3B": "#FFCA28", "4A": "#9E9D24", "4B": "#CDDC39",
+      "5A": "#558B2F", "5B": "#8BC34A", "6A": "#2E7D32", "6B": "#66BB6A",
+      "7A": "#00695C", "7B": "#26A69A", "8A": "#00838F", "8B": "#4DD0E1",
+      "9A": "#1565C0", "9B": "#42A5F5", "10A": "#4527A0", "10B": "#7E57C2",
+      "11A": "#6A1B9A", "11B": "#AB47BC", "12A": "#AD1457", "12B": "#EC407A"
+    };
+
+    const state = {
+      data: null,
+      selectedId: null,
+      highlightNeighbors: false,
+      layout: "mix",
+      sources: new Set(["tracks", "to_curate"]),
+      genre: "all",
+      search: "",
+      bpmMin: 80,
+      bpmMax: 180,
+      zoomTransform: d3.zoomIdentity,
+      zoomBehavior: null,
+      viewport: null,
+      svg: null
+    };
+
+    const audio = document.getElementById("audio");
+    const tooltip = document.getElementById("tooltip");
+
+    function camelotColor(key) {
+      return CAMELOT_COLORS[key] || "#555770";
+    }
+
+    function formatDuration(sec) {
+      if (!sec) return "–";
+      const m = Math.floor(sec / 60);
+      const s = Math.round(sec % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function filteredTracks() {
+      const q = state.search.trim().toLowerCase();
+      return state.data.tracks.filter(t => {
+        if (!state.sources.has(t.source)) return false;
+        if (state.genre !== "all" && t.genre !== state.genre && t.batch !== state.genre) return false;
+        if (t.bpm != null && (t.bpm < state.bpmMin || t.bpm > state.bpmMax)) return false;
+        if (q) {
+          const hay = `${t.artist} ${t.title} ${t.genre} ${t.batch || ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function visibleEdgeSet(trackIds) {
+      const ids = new Set(trackIds.map(t => t.id));
+      return state.data.edges.filter(e => ids.has(e.source) && ids.has(e.target));
+    }
+
+    function mixScore(a, b) {
+      if (!a.key || !b.key || a.bpm == null || b.bpm == null) return 0;
+
+      const ka = a.key.toUpperCase();
+      const kb = b.key.toUpperCase();
+      let harmonic = 0;
+      if (ka === kb) harmonic = 1;
+      else {
+        const na = ka.slice(0, -1), la = ka.slice(-1);
+        const nb = kb.slice(0, -1), lb = kb.slice(-1);
+        if (na === nb && la !== lb) harmonic = 0.82;
+        else {
+          let diff = Math.abs(Number(na) - Number(nb));
+          diff = Math.min(diff, 12 - diff);
+          if (la === lb && diff === 1) harmonic = 0.72;
+          else if (diff === 1) harmonic = 0.55;
+        }
+      }
+      if (!harmonic) return 0;
+
+      const diff = Math.abs(a.bpm - b.bpm);
+      let bpmFactor = 0;
+      if (diff <= 1) bpmFactor = 1;
+      else if (diff <= 2) bpmFactor = 0.9;
+      else if (diff <= 4) bpmFactor = 0.7;
+      else if (diff <= 6) bpmFactor = 0.45;
+      return harmonic * bpmFactor;
+    }
+
+    function mixNeighbors(trackId, tracks) {
+      const selected = tracks.find(t => t.id === trackId);
+      if (!selected) return { ids: new Set([trackId]), list: [] };
+
+      const list = tracks.filter(t => t.id !== trackId && mixScore(selected, t) >= 0.45);
+      list.sort((a, b) => mixScore(selected, b) - mixScore(selected, a));
+      const ids = new Set([trackId, ...list.map(t => t.id)]);
+      return { ids, list };
+    }
+
+    function neighborIds(trackId) {
+      return mixNeighbors(trackId, filteredTracks()).ids;
+    }
+
+    function updateNeighborsButton(activeId, neighborCount) {
+      const btn = document.getElementById("neighbors-btn");
+      btn.disabled = !activeId;
+      btn.classList.toggle("active", state.highlightNeighbors && !!activeId);
+      btn.textContent = state.highlightNeighbors && activeId
+        ? `Mix neighbors (${Math.max(neighborCount - 1, 0)})`
+        : "Mix neighbors";
+    }
+
+    function focusOnIds(ids) {
+      const tracks = filteredTracks().filter(t => ids.has(t.id) && t.x != null && t.y != null);
+      if (tracks.length < 1 || !state.svg || !state.zoomBehavior) return;
+
+      const main = document.getElementById("main");
+      const width = main.clientWidth;
+      const height = window.innerHeight;
+      const pad = 90;
+      const minX = d3.min(tracks, t => t.x) - pad;
+      const maxX = d3.max(tracks, t => t.x) + pad;
+      const minY = d3.min(tracks, t => t.y) - pad;
+      const maxY = d3.max(tracks, t => t.y) + pad;
+      const dx = Math.max(maxX - minX, 120);
+      const dy = Math.max(maxY - minY, 120);
+      const scale = Math.min(6, 0.85 / Math.max(dx / width, dy / height));
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const transform = d3.zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(scale)
+        .translate(-cx, -cy);
+
+      state.svg.transition().duration(450).call(state.zoomBehavior.transform, transform);
+    }
+
+    function updateStats(tracks, edges) {
+      document.getElementById("stat-visible").textContent = tracks.length;
+      document.getElementById("stat-links").textContent = edges.length;
+      document.getElementById("stat-library").textContent = state.data.tracks.filter(t => t.source === "tracks").length;
+      document.getElementById("stat-curate").textContent = state.data.tracks.filter(t => t.source === "to_curate").length;
+    }
+
+    function setNowPlaying(track) {
+      document.getElementById("now-title").textContent = track.title || "Unknown title";
+      document.getElementById("now-meta").textContent = [
+        track.artist,
+        track.bpm ? `${track.bpm} BPM` : null,
+        track.key || null,
+        track.genre
+      ].filter(Boolean).join(" · ");
+      audio.src = `/api/audio/${track.id}`;
+      audio.play().catch(() => {});
+    }
+
+    function buildLegend() {
+      const legend = document.getElementById("legend");
+      legend.innerHTML = "<strong style='font-size:11px;color:#444'>Camelot</strong>";
+      Object.entries(CAMELOT_COLORS).forEach(([code, color]) => {
+        const row = document.createElement("div");
+        row.className = "legend-item";
+        row.innerHTML = `<span class="legend-dot" style="background:${color}"></span>${code}`;
+        legend.appendChild(row);
+      });
+    }
+
+    function populateGenres(tracks) {
+      const select = document.getElementById("genre");
+      const genres = [...new Set(tracks.flatMap(t => [t.genre, t.batch].filter(Boolean)))].sort();
+      genres.forEach(g => {
+        const opt = document.createElement("option");
+        opt.value = g;
+        opt.textContent = g;
+        select.appendChild(opt);
+      });
+    }
+
+    function renderGraph() {
+      const tracks = filteredTracks();
+      const edges = visibleEdgeSet(tracks);
+      updateStats(tracks, edges);
+
+      const width = document.getElementById("main").clientWidth;
+      const height = window.innerHeight;
+      let svg = d3.select("#graph");
+
+      if (state.svg && state.viewport) {
+        state.viewport.selectAll("*").remove();
+      } else {
+        svg.selectAll("*").remove();
+        svg = svg
+          .attr("viewBox", `0 0 ${width} ${height}`)
+          .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const zoom = d3.zoom()
+          .scaleExtent([0.15, 12])
+          .filter((event) => {
+            if (event.type === "wheel") return true;
+            if (event.type.startsWith("touch")) return true;
+            if (event.button === 1) return true;
+            const onNode = event.target.closest && event.target.closest(".node");
+            if (onNode) return false;
+            return event.type === "mousedown" && event.button === 0;
+          })
+          .on("start", () => svg.classed("is-panning", true))
+          .on("end", () => svg.classed("is-panning", false))
+          .on("zoom", (event) => {
+            state.zoomTransform = event.transform;
+            state.viewport.attr("transform", event.transform);
+          });
+
+        state.zoomBehavior = zoom;
+        state.viewport = svg.append("g").attr("class", "viewport");
+        state.svg = svg;
+
+        svg.call(zoom).call(zoom.transform, state.zoomTransform);
+      }
+
+      svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+      const bpmExtent = d3.extent(tracks.filter(t => t.bpm != null), d => d.bpm) || [120, 130];
+      const x = d3.scaleLinear().domain([Math.max(80, bpmExtent[0] - 2), (bpmExtent[1] || 130) + 2]).range([80, width - 40]);
+      const y = d3.scaleLinear().domain([0, 1]).range([height - 60, 40]);
+
+      const viewport = state.viewport;
+
+      viewport.append("rect")
+        .attr("class", "zoom-surface")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", width)
+        .attr("height", height)
+        .attr("fill", "transparent")
+        .style("pointer-events", "all");
+
+      viewport.append("text").attr("class", "axis-label").attr("x", width / 2).attr("y", height - 16).attr("text-anchor", "middle").text("BPM →");
+      viewport.append("text").attr("class", "axis-label").attr("x", 18).attr("y", height / 2).attr("transform", `rotate(-90 18 ${height / 2})`).attr("text-anchor", "middle").text("Energy →");
+
+      tracks.forEach(t => {
+        t.x = t.bpm != null ? x(t.bpm) : width / 2;
+        t.y = y(t.energy ?? 0.5);
+      });
+
+      const simulation = d3.forceSimulation(tracks)
+        .force("link", d3.forceLink(edges).id(d => d.id).distance(d => 120 - d.score * 60).strength(d => d.score * 0.35))
+        .force("charge", d3.forceManyBody().strength(-18))
+        .force("collide", d3.forceCollide().radius(10));
+
+      if (state.layout === "mix") {
+        simulation
+          .force("x", d3.forceX(d => d.bpm != null ? x(d.bpm) : width / 2).strength(0.85))
+          .force("y", d3.forceY(d => y(d.energy ?? 0.5)).strength(0.85));
+      } else {
+        simulation.force("x", d3.forceX(width / 2).strength(0.03)).force("y", d3.forceY(height / 2).strength(0.03));
+      }
+
+      const link = viewport.append("g").attr("class", "links").selectAll("line").data(edges).join("line")
+        .attr("class", "link")
+        .style("pointer-events", "none");
+
+      const mixLinks = viewport.append("g").attr("class", "mix-links");
+
+      function updateMixLinks() {
+        mixLinks.selectAll("*").remove();
+        const active = state.selectedId;
+        if (!active || !state.highlightNeighbors) return;
+        const selected = tracks.find(t => t.id === active);
+        if (!selected || selected.x == null) return;
+        const { list } = mixNeighbors(active, tracks);
+        mixLinks.selectAll("line")
+          .data(list)
+          .join("line")
+          .attr("class", "link highlight mix-link")
+          .attr("x1", selected.x)
+          .attr("y1", selected.y)
+          .attr("x2", d => d.x)
+          .attr("y2", d => d.y);
+      }
+
+      const drag = d3.drag()
+        .clickDistance(4)
+        .on("start", (event, d) => {
+          event.sourceEvent.stopPropagation();
+          if (!event.active) simulation.alphaTarget(0.25).restart();
+          const [px, py] = d3.pointer(event, viewport.node());
+          d.fx = px;
+          d.fy = py;
+        })
+        .on("drag", (event, d) => {
+          const [px, py] = d3.pointer(event, viewport.node());
+          d.fx = px;
+          d.fy = py;
+        })
+        .on("end", (event, d) => {
+          if (!event.active) simulation.alphaTarget(0);
+          if (state.layout === "mix") { d.fx = null; d.fy = null; }
+        });
+
+      const node = viewport.append("g").attr("class", "nodes").selectAll("g").data(tracks).join("g")
+        .attr("class", d => `node ${d.source === "to_curate" ? "to-curate" : ""}`)
+        .call(drag);
+
+      node.append("circle")
+        .attr("class", "core")
+        .attr("r", d => 5 + (d.duration_sec ? Math.min(d.duration_sec / 120, 1.5) : 0))
+        .attr("fill", d => camelotColor(d.key))
+        .attr("stroke", d => d.source === "to_curate" ? "#d48806" : "rgba(0,0,0,0.2)");
+
+      function refreshHighlight() {
+        const active = state.selectedId;
+        const neighbors = active && state.highlightNeighbors ? neighborIds(active) : null;
+        node.classed("selected", d => d.id === active);
+        node.classed("neighbor", d => neighbors && neighbors.has(d.id) && d.id !== active);
+        node.classed("dim", d => neighbors && !neighbors.has(d.id));
+        link.classed("highlight", e => {
+          if (!active || !state.highlightNeighbors || !neighbors) return false;
+          return neighbors.has(e.source.id) && neighbors.has(e.target.id);
+        });
+        updateMixLinks();
+        updateNeighborsButton(active, neighbors ? neighbors.size : 0);
+
+        if (active && state.highlightNeighbors) {
+          const { list } = mixNeighbors(active, tracks);
+          const meta = document.getElementById("now-meta");
+          const playing = state.data.tracks.find(t => t.id === active);
+          if (playing && list.length) {
+            meta.textContent = `${list.length} mixable neighbor${list.length === 1 ? "" : "s"} · ${playing.bpm || "?"} BPM · ${playing.key || "?"}`;
+          }
+        }
+      }
+
+      node.on("mouseenter", (event, d) => {
+        tooltip.style.opacity = 1;
+        tooltip.style.left = `${event.pageX + 14}px`;
+        tooltip.style.top = `${event.pageY + 10}px`;
+        tooltip.innerHTML = `
+          <strong>${d.title}</strong>
+          <div class="row">${d.artist}</div>
+          <div class="row">${d.bpm ? d.bpm + " BPM" : "? BPM"} · ${d.key || "? key"} · energy ${(d.energy ?? 0.5).toFixed(2)}</div>
+          <div class="row">${d.genre}${d.batch ? " / " + d.batch : ""} · ${formatDuration(d.duration_sec)}</div>
+        `;
+      }).on("mousemove", (event) => {
+        tooltip.style.left = `${event.pageX + 14}px`;
+        tooltip.style.top = `${event.pageY + 10}px`;
+      }).on("mouseleave", () => {
+        tooltip.style.opacity = 0;
+      }).on("click", (_, d) => {
+        state.selectedId = d.id;
+        setNowPlaying(d);
+        refreshHighlight();
+      });
+
+      simulation.on("tick", () => {
+        link
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
+        node.attr("transform", d => `translate(${d.x},${d.y})`);
+        if (state.highlightNeighbors) updateMixLinks();
+      });
+
+      refreshHighlight();
+      state.refreshHighlight = refreshHighlight;
+
+      if (state.highlightNeighbors && state.selectedId) {
+        simulation.on("end", () => {
+          focusOnIds(neighborIds(state.selectedId));
+        });
+      }
+    }
+
+    function resetView(animate = true) {
+      if (!state.svg || !state.zoomBehavior) return;
+      state.zoomTransform = d3.zoomIdentity;
+      const svg = state.svg;
+      if (animate) {
+        svg.transition().duration(350).call(state.zoomBehavior.transform, d3.zoomIdentity);
+      } else {
+        svg.call(state.zoomBehavior.transform, d3.zoomIdentity);
+      }
+    }
+
+    async function init() {
+      buildLegend();
+      const res = await fetch("/api/library");
+      state.data = await res.json();
+      populateGenres(state.data.tracks);
+      renderGraph();
+
+      document.getElementById("search").addEventListener("input", e => {
+        state.search = e.target.value;
+        renderGraph();
+      });
+
+      document.getElementById("genre").addEventListener("change", e => {
+        state.genre = e.target.value;
+        renderGraph();
+      });
+
+      function updateBpmLabel() {
+        document.getElementById("bpm-label").textContent = `${state.bpmMin}–${state.bpmMax}`;
+      }
+
+      ["bpm-min", "bpm-max"].forEach(id => {
+        document.getElementById(id).addEventListener("input", e => {
+          state.bpmMin = Number(document.getElementById("bpm-min").value);
+          state.bpmMax = Number(document.getElementById("bpm-max").value);
+          if (state.bpmMin > state.bpmMax) {
+            [state.bpmMin, state.bpmMax] = [state.bpmMax, state.bpmMin];
+          }
+          updateBpmLabel();
+          renderGraph();
+        });
+      });
+      updateBpmLabel();
+
+      document.querySelectorAll("#source-filters .chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const src = chip.dataset.source;
+          if (src === "all") {
+            const allActive = state.sources.size === 2;
+            state.sources = allActive ? new Set() : new Set(["tracks", "to_curate"]);
+            document.querySelectorAll("#source-filters .chip").forEach(c => c.classList.toggle("active", !allActive || c.dataset.source === "all" || c.dataset.source === "tracks" || c.dataset.source === "to_curate"));
+            if (!allActive) document.querySelectorAll("#source-filters .chip").forEach(c => c.classList.add("active"));
+            else document.querySelectorAll("#source-filters .chip:not([data-source=all])").forEach(c => c.classList.remove("active"));
+            return;
+          }
+          if (state.sources.has(src)) state.sources.delete(src); else state.sources.add(src);
+          chip.classList.toggle("active");
+          renderGraph();
+        });
+      });
+
+      document.querySelectorAll("#layout-modes .chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          document.querySelectorAll("#layout-modes .chip").forEach(c => c.classList.remove("active"));
+          chip.classList.add("active");
+          state.layout = chip.dataset.layout;
+          renderGraph();
+        });
+      });
+
+      document.getElementById("play-btn").addEventListener("click", () => {
+        if (audio.src) audio.paused ? audio.play() : audio.pause();
+      });
+
+      document.getElementById("neighbors-btn").addEventListener("click", () => {
+        if (!state.selectedId) {
+          document.getElementById("now-meta").textContent = "Select a track on the graph first";
+          return;
+        }
+        state.highlightNeighbors = !state.highlightNeighbors;
+        state.refreshHighlight?.();
+        if (state.highlightNeighbors) {
+          const ids = neighborIds(state.selectedId);
+          setTimeout(() => focusOnIds(ids), 300);
+        }
+      });
+
+      updateNeighborsButton(null, 0);
+
+      document.getElementById("reset-view-btn").addEventListener("click", () => resetView(true));
+
+      window.addEventListener("resize", () => {
+        state.svg = null;
+        state.viewport = null;
+        state.zoomBehavior = null;
+        renderGraph();
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
