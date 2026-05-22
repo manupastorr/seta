@@ -1573,6 +1573,103 @@
       letter-spacing: 0.03em;
       pointer-events: none;
     }
+
+    .player-shortcuts-hint {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .player-shortcuts-hint kbd,
+    .shortcuts-panel kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.9);
+      font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text);
+    }
+
+    .shortcuts-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(18, 18, 28, 0.35);
+      backdrop-filter: blur(4px);
+    }
+
+    .shortcuts-overlay[hidden] {
+      display: none !important;
+    }
+
+    .shortcuts-panel {
+      width: min(420px, 100%);
+      max-height: min(80vh, 520px);
+      overflow-y: auto;
+      padding: 16px 18px;
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+    }
+
+    .shortcuts-panel h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .shortcuts-group {
+      margin-bottom: 12px;
+    }
+
+    .shortcuts-group h3 {
+      margin: 0 0 6px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .shortcuts-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+
+    .shortcuts-row dt {
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    .shortcuts-row dd {
+      margin: 0;
+      text-align: right;
+      color: var(--muted);
+    }
+
+    .shortcuts-foot {
+      margin: 10px 0 0;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .neighbor-item.is-queue-focus:not(.is-active) {
+      background: rgba(107, 79, 216, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(107, 79, 216, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -1684,12 +1781,21 @@
           <div class="time-row">
             <span id="time-current">0:00</span>
             <span id="time-total">0:00</span>
+            <span class="player-shortcuts-hint"><kbd>?</kbd> shortcuts</span>
           </div>
         </div>
       </div>
       <audio id="audio" preload="metadata"></audio>
     </footer>
     <div id="ellipsis-tip" hidden></div>
+
+    <div id="shortcuts-overlay" class="shortcuts-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+      <div class="shortcuts-panel">
+        <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+        <div id="shortcuts-body"></div>
+        <p class="shortcuts-foot">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -1711,6 +1817,45 @@
     const LOUPE = { size: 140, scale: 2.5, sourceRadius: 56, hitRadius: 12, hideWhenHitPx: 22, clickDragTolerance: 5, clickPickRadius: 10, hoverRadiusBoost: 5 };
     const ELLIPSIS_TIP_SHOW_MS = 100;
     const ELLIPSIS_TIP_SELECTOR = ".player-title, .player-artist, .neighbor-title, .neighbor-artist";
+
+    const SHORTCUT_GROUPS = [
+      {
+        title: "Playback",
+        rows: [
+          { keys: "Space", desc: "Play / pause" },
+          { keys: "← →", desc: "Previous / next track" },
+          { keys: "Shift ← →", desc: "Seek ±10s (±5s on waveform)" },
+        ],
+      },
+      {
+        title: "Search",
+        rows: [
+          { keys: "⌘K / Ctrl+K", desc: "Focus search" },
+          { keys: "/", desc: "Focus search (alternate)" },
+          { keys: "↑ ↓ Enter", desc: "Browse results, play selection" },
+          { keys: "Esc", desc: "Close results / clear search" },
+        ],
+      },
+      {
+        title: "Mix queue",
+        rows: [
+          { keys: "↑ ↓", desc: "Move in queue (neighbors on)" },
+          { keys: "Enter", desc: "Play highlighted queue track" },
+          { keys: "n", desc: "Toggle neighbors" },
+        ],
+      },
+      {
+        title: "Map & filters",
+        rows: [
+          { keys: "r", desc: "Reset map view" },
+          { keys: "Esc", desc: "Clear filters → neighbors → reset view" },
+        ],
+      },
+      {
+        title: "Help",
+        rows: [{ keys: "?", desc: "Show this menu" }],
+      },
+    ];
     const SEARCH_MAX_RESULTS = 12;
     let ellipsisTipEl = null;
     let ellipsisTipTimer = null;
@@ -1785,7 +1930,9 @@
       hoveredId: null,
       viewFilterSignature: null,
       autoFitTimer: null,
-      neighborFocusTimer: null
+      neighborFocusTimer: null,
+      shortcutsOpen: false,
+      queueFocusIndex: -1
     };
 
     const audio = document.getElementById("audio");
@@ -2903,7 +3050,15 @@
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        hideSearchResults();
+        if (state.search.trim()) {
+          state.search = "";
+          event.target.value = "";
+          hideSearchResults();
+          renderGraph();
+        } else {
+          hideSearchResults();
+          event.target.blur();
+        }
         return;
       }
       if (event.key !== "Enter") return;
@@ -3076,6 +3231,7 @@
         list.innerHTML = "";
         emptyEl.hidden = true;
         countEl.textContent = "";
+        state.queueFocusIndex = -1;
         syncNeighborPanelCollapse();
         return;
       }
@@ -3121,6 +3277,7 @@
       scrollNeighborItemIntoView(state.playingId || anchorId);
       syncNeighborPanelCollapse();
       syncEllipsisTooltips(list);
+      initQueueFocusFromPlaying();
     }
 
     function viewFilterSignature() {
@@ -3546,11 +3703,270 @@
       return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
     }
 
-    function handleSpaceToggle(event) {
-      if (event.code !== "Space" && event.key !== " ") return;
+    function isWaveformFocused() {
+      return document.activeElement === document.getElementById("waveform");
+    }
+
+    function canQueueKeyboardNav() {
+      const panel = document.getElementById("neighbor-panel");
+      return state.highlightNeighbors
+        && !!neighborAnchorId()
+        && panel?.classList.contains("is-visible");
+    }
+
+    function neighborQueueItems() {
+      return [...document.querySelectorAll("#neighbor-list .neighbor-item[data-track-id]")];
+    }
+
+    function syncQueueFocusHighlight() {
+      const items = neighborQueueItems();
+      items.forEach((el, i) => el.classList.toggle("is-queue-focus", i === state.queueFocusIndex));
+      const active = items[state.queueFocusIndex];
+      active?.scrollIntoView({ block: "nearest" });
+    }
+
+    function initQueueFocusFromPlaying() {
+      if (!canQueueKeyboardNav()) {
+        state.queueFocusIndex = -1;
+        return;
+      }
+      const items = neighborQueueItems();
+      const preferred = state.playingId || state.selectedId;
+      state.queueFocusIndex = items.findIndex(el => el.dataset.trackId === preferred);
+      syncQueueFocusHighlight();
+    }
+
+    function moveQueueFocus(step) {
+      const items = neighborQueueItems();
+      if (!items.length) return false;
+      if (state.queueFocusIndex < 0) {
+        const preferred = state.playingId || state.selectedId;
+        state.queueFocusIndex = items.findIndex(el => el.dataset.trackId === preferred);
+        if (state.queueFocusIndex < 0) state.queueFocusIndex = 0;
+      } else {
+        state.queueFocusIndex = (state.queueFocusIndex + step + items.length) % items.length;
+      }
+      syncQueueFocusHighlight();
+      return true;
+    }
+
+    function activateQueueFocus() {
+      const items = neighborQueueItems();
+      const el = items[state.queueFocusIndex];
+      if (!el?.dataset.trackId || !state.data) return;
+      const track = state.data.tracks.find(t => t.id === el.dataset.trackId);
+      if (track) setNowPlaying(track);
+    }
+
+    function seekBySeconds(delta) {
+      if (!audio.src || !Number.isFinite(audio.duration)) return;
+      audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + delta));
+      updateSeekUi();
+    }
+
+    function clearViewFilters() {
+      let changed = false;
+      if (state.activeMoments.size) {
+        state.activeMoments.clear();
+        changed = true;
+      }
+      if (state.activeKeys.size) {
+        state.activeKeys.clear();
+        changed = true;
+      }
+      if (state.genre !== "all") {
+        state.genre = "all";
+        const genreEl = document.getElementById("genre");
+        if (genreEl) genreEl.value = "all";
+        changed = true;
+      }
+      if (state.bpmMin > PLOT.bpmDomain[0] || state.bpmMax < PLOT.bpmDomain[1]) {
+        resetBpmRange();
+        changed = true;
+      }
+      if (changed) renderGraph();
+      return changed;
+    }
+
+    function enableNeighborsMode() {
+      state.highlightNeighbors = true;
+      state.neighborQueueAnchor = state.selectedId;
+      syncPlayQueue();
+      focusNeighborGroup(state.selectedId);
+      renderGraph();
+    }
+
+    function disableNeighborsMode() {
+      if (!state.highlightNeighbors) return;
+      state.highlightNeighbors = false;
+      if (state.neighborFocusTimer) {
+        clearTimeout(state.neighborFocusTimer);
+        state.neighborFocusTimer = null;
+      }
+      state.neighborQueueAnchor = null;
+      state.queueFocusIndex = -1;
+      syncPlayQueue();
+      setTimeout(() => restoreMapView(true), 300);
+      renderGraph();
+    }
+
+    function toggleNeighborsMode() {
+      if (!state.selectedId) {
+        setPlayerIdle("Select a track on the graph first");
+        return;
+      }
+      if (state.highlightNeighbors) disableNeighborsMode();
+      else enableNeighborsMode();
+    }
+
+    function resetViewWithCleanup() {
+      if (state.autoFitTimer) {
+        clearTimeout(state.autoFitTimer);
+        state.autoFitTimer = null;
+      }
+      resetView(true);
+    }
+
+    function setShortcutsOpen(open) {
+      state.shortcutsOpen = open;
+      const overlay = document.getElementById("shortcuts-overlay");
+      if (!overlay) return;
+      overlay.hidden = !open;
+      overlay.setAttribute("aria-hidden", open ? "false" : "true");
+    }
+
+    function renderShortcutsHelp() {
+      const body = document.getElementById("shortcuts-body");
+      if (!body) return;
+      body.innerHTML = SHORTCUT_GROUPS.map(group => `
+        <section class="shortcuts-group">
+          <h3>${group.title}</h3>
+          <dl>
+            ${group.rows.map(row => `
+              <div class="shortcuts-row">
+                <dt><kbd>${row.keys}</kbd></dt>
+                <dd>${row.desc}</dd>
+              </div>
+            `).join("")}
+          </dl>
+        </section>
+      `).join("");
+    }
+
+    function handleEscapeStack() {
+      if (state.shortcutsOpen) {
+        setShortcutsOpen(false);
+        return true;
+      }
+      if (state.searchResultsOpen || state.search.trim()) {
+        state.search = "";
+        const searchEl = document.getElementById("search");
+        if (searchEl) searchEl.value = "";
+        hideSearchResults();
+        renderGraph();
+        return true;
+      }
+      if (viewFiltersActive()) {
+        clearViewFilters();
+        return true;
+      }
+      if (state.highlightNeighbors) {
+        disableNeighborsMode();
+        return true;
+      }
+      resetViewWithCleanup();
+      return true;
+    }
+
+    function focusSearchField() {
+      const searchEl = document.getElementById("search");
+      searchEl?.focus();
+      searchEl?.select();
+    }
+
+    function handleGlobalKeydown(event) {
+      if (state.shortcutsOpen) {
+        if (event.key === "Escape" || event.key === "?") {
+          event.preventDefault();
+          setShortcutsOpen(false);
+        }
+        return;
+      }
+
+      if (event.key === "?" && !event.ctrlKey && !event.metaKey && !event.altKey && !isTypingTarget(event.target)) {
+        event.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (handleEscapeStack()) {
+          event.preventDefault();
+        }
+        return;
+      }
+
       if (isTypingTarget(event.target)) return;
-      event.preventDefault();
-      togglePlayPause();
+
+      const cmdOrCtrl = event.metaKey || event.ctrlKey;
+      if ((event.key === "k" || event.key === "K") && cmdOrCtrl && !event.altKey) {
+        event.preventDefault();
+        focusSearchField();
+        return;
+      }
+
+      if (event.key === "/" && !cmdOrCtrl) {
+        event.preventDefault();
+        focusSearchField();
+        return;
+      }
+
+      if ((event.key === "n" || event.key === "N") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        toggleNeighborsMode();
+        return;
+      }
+
+      if ((event.key === "r" || event.key === "R") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        resetViewWithCleanup();
+        return;
+      }
+
+      if (event.code === "Space" || event.key === " ") {
+        event.preventDefault();
+        togglePlayPause();
+        return;
+      }
+
+      if (isWaveformFocused() && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+        return;
+      }
+
+      if (canQueueKeyboardNav() && !event.shiftKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+        event.preventDefault();
+        moveQueueFocus(event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+
+      if (canQueueKeyboardNav() && event.key === "Enter") {
+        event.preventDefault();
+        activateQueueFocus();
+        return;
+      }
+
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        const fwd = event.key === "ArrowRight";
+        if (event.shiftKey && audio.src && Number.isFinite(audio.duration)) {
+          event.preventDefault();
+          seekBySeconds(fwd ? 10 : -10);
+          return;
+        }
+        if (!event.shiftKey) {
+          event.preventDefault();
+          playRelative(fwd ? 1 : -1);
+        }
+      }
     }
 
     function playRelative(step) {
@@ -4123,7 +4539,12 @@
       document.getElementById("play-btn").addEventListener("click", togglePlayPause);
       document.getElementById("prev-btn").addEventListener("click", () => playRelative(-1));
       document.getElementById("next-btn").addEventListener("click", () => playRelative(1));
-      document.addEventListener("keydown", handleSpaceToggle);
+      document.addEventListener("keydown", handleGlobalKeydown);
+      renderShortcutsHelp();
+      const shortcutsOverlay = document.getElementById("shortcuts-overlay");
+      shortcutsOverlay?.addEventListener("click", (e) => {
+        if (e.target === shortcutsOverlay) setShortcutsOpen(false);
+      });
 
       setupWaveform();
       bindEllipsisTips();
@@ -4157,27 +4578,7 @@
       audio.addEventListener("pause", updatePlayButton);
       audio.addEventListener("ended", () => playRelative(1));
 
-      document.getElementById("neighbors-btn").addEventListener("click", () => {
-        if (!state.selectedId) {
-          setPlayerIdle("Select a track on the graph first");
-          return;
-        }
-        state.highlightNeighbors = !state.highlightNeighbors;
-        if (state.highlightNeighbors) {
-          state.neighborQueueAnchor = state.selectedId;
-          syncPlayQueue();
-          focusNeighborGroup(state.selectedId);
-        } else {
-          if (state.neighborFocusTimer) {
-            clearTimeout(state.neighborFocusTimer);
-            state.neighborFocusTimer = null;
-          }
-          state.neighborQueueAnchor = null;
-          syncPlayQueue();
-          setTimeout(() => restoreMapView(true), 300);
-        }
-        renderGraph();
-      });
+      document.getElementById("neighbors-btn").addEventListener("click", toggleNeighborsMode);
 
       document.getElementById("neighbor-list").addEventListener("click", (event) => {
         const btn = event.target.closest(".neighbor-item");
@@ -4195,13 +4596,7 @@
 
       updateNeighborsButton(null, 0);
 
-      document.getElementById("reset-view-btn").addEventListener("click", () => {
-        if (state.autoFitTimer) {
-          clearTimeout(state.autoFitTimer);
-          state.autoFitTimer = null;
-        }
-        resetView(true);
-      });
+      document.getElementById("reset-view-btn").addEventListener("click", resetViewWithCleanup);
 
       window.addEventListener("resize", () => {
         state.svg = null;
