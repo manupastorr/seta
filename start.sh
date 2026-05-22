@@ -30,7 +30,11 @@ echo "Scanning library (cached analysis reused when possible)..."
 if [[ ${#SCAN_ARGS[@]} -gt 0 && " ${SCAN_ARGS[*]} " == *" --skip-edges "* ]]; then
   echo "Quick scan: skipping mix-edge rebuild"
 fi
-"$PY" scan_library.py "${SCAN_ARGS[@]}"
+if [[ ${#SCAN_ARGS[@]} -gt 0 ]]; then
+  "$PY" scan_library.py "${SCAN_ARGS[@]}"
+else
+  "$PY" scan_library.py
+fi
 
 echo "Starting Seta..."
 exec "$PY" server.py
