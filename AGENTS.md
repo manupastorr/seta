@@ -46,10 +46,15 @@ After changing `analyze.py`, bump `ANALYSIS_VERSION` so the cache re-analyzes st
 
 ## BPM analysis
 
-- Librosa often doubles tempo on organic/downtempo/cumbia (~86 shown as ~172)
-- `analyze.py` halves suspicious **147–176 BPM** hits when half-time **70–95 BPM** fits onset scoring better
-- UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`
-- Map BPM domain: **70–180**
+Unified resolver in `analyze.py` (see `ANALYSIS_VERSION`):
+
+1. **Tagged ≥100 BPM** — trust store tag (Soundeo/Beatport full-tempo tags).
+2. **Tagged 68–92 BPM** — half-time tag zone; double only when librosa also anchors ~140–165 BPM (peak techno) or ambiguous raw + close margin. Organic/cumbia tags stay slow.
+3. **No tag** — score librosa octave candidates; prefer primary tempo when a half-time octave was picked; lift obvious psy/techno false halves (~72 → ~140 when scores are close). Prefer half-time when librosa primary is ~155–180 but onset favours ~78–95 (downtempo/organic).
+
+UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confidence`
+
+Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 
 ## UI conventions
 

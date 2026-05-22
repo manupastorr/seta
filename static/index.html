@@ -247,6 +247,9 @@
 
     .node circle.core {
       pointer-events: all;
+      stroke-width: 0.75px;
+      cursor: pointer;
+      vector-effect: non-scaling-stroke;
     }
 
     .link {
@@ -264,11 +267,7 @@
     .mix-link {
       stroke: rgba(107, 79, 216, 0.28);
       stroke-width: 0.75;
-    }
-
-    .node circle.core {
-      stroke-width: 0.75px;
-      cursor: pointer;
+      vector-effect: non-scaling-stroke;
     }
 
     .node.selected circle.core {
@@ -1160,6 +1159,7 @@
           .data(list)
           .join("line")
           .attr("class", "link highlight mix-link")
+          .attr("vector-effect", "non-scaling-stroke")
           .attr("x1", selected.x)
           .attr("y1", selected.y)
           .attr("x2", d => d.x)
@@ -1197,6 +1197,7 @@
 
       node.append("circle")
         .attr("class", "core")
+        .attr("vector-effect", "non-scaling-stroke")
         .attr("r", d => 3 + (d.duration_sec ? Math.min(d.duration_sec / 180, 1) : 0))
         .attr("fill", d => camelotColor(d.key))
         .attr("stroke", d => d.source === "to_curate" ? "#d48806" : "rgba(0,0,0,0.12)");
@@ -1239,10 +1240,15 @@
           <div class="row">${d.artist}</div>
           <div class="row">${formatBpm(d)} · ${d.key || "? key"} · energy ${(d.energy ?? 0.5).toFixed(2)}</div>
           ${d.bpm_octave_corrected && d.bpm_raw != null && Math.abs(d.bpm - d.bpm_raw) >= 4
-            ? `<div class="row">Analyzer heard ${d.bpm_raw} BPM; placed using half-time grid.</div>`
+            ? d.bpm_source === "tag"
+              ? `<div class="row">File tag was half-time (${formatBpm({ bpm: d.bpm_raw })}); doubled for DJ tempo.</div>`
+              : `<div class="row">Analyzer heard ${d.bpm_raw} BPM; placed using half-time grid.</div>`
             : d.bpm_source === "tag"
               ? `<div class="row">BPM from file tag.</div>`
               : ""}
+          ${d.bpm_confidence != null && d.bpm_confidence < 0.45
+            ? `<div class="row">Low BPM confidence (${d.bpm_confidence.toFixed(2)}); verify in Rekordbox if needed.</div>`
+            : ""}
           <div class="row">${d.genre}${d.batch ? " / " + d.batch : ""} · ${formatDuration(d.duration_sec)}</div>
         `;
       }).on("mousemove", (event) => {
