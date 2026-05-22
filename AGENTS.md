@@ -83,7 +83,7 @@ Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 - `./start.sh --quick` runs `scan_library.py --skip-edges` for faster rescans when only adding tracks
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
 - Changing filters (set moments, Camelot, genre, BPM range, search, library source) auto-zooms to the visible filtered nodes; clearing all filters resets the map view
-- Set-moment clouds are fixed BPM×energy zones (visual only): dance-floor arc plus **Close eyes**, **Chill groove**, and **Slow burn** (organic pulse at slow BPM); toggle **Set moments**
+- Set-moment clouds are fixed BPM×energy zones (visual only); legend order follows set flow: **Open / low** → **Floor** → **Late** → **Wind-down** (Closing last)
 - Keep changes minimal; no new dependencies without good reason
 
 ## Git

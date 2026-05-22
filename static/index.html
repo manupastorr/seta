@@ -1505,6 +1505,19 @@
       gap: 0;
     }
 
+    .moment-legend-section-title {
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 6px 5px 2px;
+    }
+
+    .moment-legend-section-title:first-child {
+      padding-top: 2px;
+    }
+
     .moment-legend-item {
       display: flex;
       align-items: center;
@@ -1716,13 +1729,20 @@
       { id: "chill-groove", label: "Chill groove", bpm: [88, 112], energy: [0.35, 0.58], color: "#AED581" },
       { id: "slow-burn", label: "Slow burn", bpm: [70, 100], energy: [0.43, 0.88], color: "#FFAB91" },
       { id: "warmup", label: "Warm up", bpm: [80, 118], energy: [0.05, 0.58], color: "#5B8DEF" },
-      { id: "closing", label: "Closing", bpm: [92, 126], energy: [0.05, 0.50], color: "#90A4AE" },
       { id: "playful", label: "Playful", bpm: [108, 134], energy: [0.40, 0.74], color: "#6FBF73" },
       { id: "groove", label: "Groove", bpm: [80, 124], energy: [0.50, 0.82], color: "#FFB74D" },
       { id: "peak", label: "Peak", bpm: [112, 142], energy: [0.56, 0.95], color: "#E57373" },
       { id: "hypnotic", label: "Hypnotic", bpm: [128, 180], energy: [0.30, 0.72], color: "#4DB6AC" },
       { id: "hard", label: "Hard / driving", bpm: [126, 180], energy: [0.66, 1.0], color: "#9575CD" },
-      { id: "minimal", label: "Strip-back", bpm: [118, 180], energy: [0.05, 0.38], color: "#B0BEC5" }
+      { id: "minimal", label: "Strip-back", bpm: [118, 180], energy: [0.05, 0.38], color: "#B0BEC5" },
+      { id: "closing", label: "Closing", bpm: [92, 126], energy: [0.05, 0.50], color: "#90A4AE" }
+    ];
+
+    const SET_MOMENT_SECTIONS = [
+      { label: "Open / low", ids: ["close-eyes", "chill-groove", "slow-burn", "warmup"] },
+      { label: "Floor", ids: ["playful", "groove", "peak"] },
+      { label: "Late", ids: ["hypnotic", "hard", "minimal"] },
+      { label: "Wind-down", ids: ["closing"] },
     ];
 
     const state = {
@@ -2575,14 +2595,23 @@
           <div class="moments-legend-grid"></div>
         </div>`;
       const grid = legend.querySelector(".moments-legend-grid");
-      SET_MOMENTS.forEach(moment => {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "moment-legend-item";
-        row.classList.toggle("active", state.activeMoments.has(moment.id));
-        row.dataset.momentId = moment.id;
-        row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label">${moment.label}</span>`;
-        grid.appendChild(row);
+      const momentById = new Map(SET_MOMENTS.map(m => [m.id, m]));
+      SET_MOMENT_SECTIONS.forEach(section => {
+        const heading = document.createElement("div");
+        heading.className = "moment-legend-section-title";
+        heading.textContent = section.label;
+        grid.appendChild(heading);
+        section.ids.forEach(id => {
+          const moment = momentById.get(id);
+          if (!moment) return;
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = "moment-legend-item";
+          row.classList.toggle("active", state.activeMoments.has(moment.id));
+          row.dataset.momentId = moment.id;
+          row.innerHTML = `<span class="moment-cloud" style="color:${moment.color}" aria-hidden="true">☁</span><span class="moment-legend-label">${moment.label}</span>`;
+          grid.appendChild(row);
+        });
       });
       syncMomentsLegendCollapse();
     }
