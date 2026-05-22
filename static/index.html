@@ -29,7 +29,7 @@
 
     #app {
       --mix-dock-width: 0px;
-      --filter-bar-height: 88px;
+      --filter-bar-height: 62px;
       --player-height: 72px;
       display: grid;
       grid-template-columns: 1fr;
@@ -77,7 +77,7 @@
     .filter-bar-groups {
       flex: 1 1 420px;
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
       gap: 8px 12px;
       min-width: 0;
@@ -88,6 +88,22 @@
       align-items: center;
       gap: 6px;
       min-width: 0;
+      flex: 0 0 auto;
+    }
+
+    .filter-group-search {
+      flex: 1 1 auto;
+      min-width: 240px;
+      max-width: 300px;
+    }
+
+    .filter-group-source {
+      flex: 0 0 auto;
+    }
+
+    .filter-group-genre {
+      flex: 0 0 180px;
+      width: 180px;
     }
 
     .filter-label-inline {
@@ -110,11 +126,6 @@
       clip: rect(0, 0, 0, 0);
       white-space: nowrap;
       border: 0;
-    }
-
-    .filter-group-search {
-      flex: 1 1 200px;
-      max-width: 300px;
     }
 
     .search-field {
@@ -160,17 +171,16 @@
     }
 
     .filter-bar #genre {
-      width: auto;
-      min-width: 118px;
-      max-width: 160px;
+      width: 100%;
       padding: 6px 8px;
       font-size: 12px;
     }
 
     .filter-group-bpm {
-      flex: 1 1 170px;
-      max-width: 250px;
-      min-width: 150px;
+      flex: 0 0 170px;
+      width: 170px;
+      max-width: 170px;
+      min-width: 170px;
       align-items: center;
       gap: 4px;
     }
@@ -274,8 +284,9 @@
     }
 
     .filter-group-map {
-      flex: 1 1 280px;
-      flex-wrap: wrap;
+      flex: 0 0 auto;
+      flex-wrap: nowrap;
+      margin-left: auto;
     }
 
     .filter-group-map #view-controls {
@@ -1788,7 +1799,7 @@
           </div>
         </div>
 
-        <div class="filter-group">
+        <div class="filter-group filter-group-source">
           <div class="chip-row" id="source-filters">
             <button class="chip active" data-source="all">All</button>
             <button class="chip" data-source="tracks">Library</button>
@@ -1796,7 +1807,7 @@
           </div>
         </div>
 
-        <div class="filter-group">
+        <div class="filter-group filter-group-genre">
           <label class="sr-only" for="genre">Genre</label>
           <select id="genre"><option value="all">All genres</option></select>
         </div>
@@ -4735,6 +4746,7 @@
       state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
       populateGenres(state.data.tracks);
       restoreFilterState();
+      syncUiLayout();
       renderGraph();
 
       document.getElementById("search").addEventListener("input", e => {
