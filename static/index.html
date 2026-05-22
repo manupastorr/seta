@@ -279,6 +279,10 @@
       stroke-width: 0.75px;
     }
 
+    .node.bpm-corrected circle.core {
+      stroke-dasharray: 1.5 2;
+    }
+
     .node.dim circle.core {
       opacity: 0.08;
     }
@@ -425,7 +429,7 @@
       <select id="genre"><option value="all">All genres</option></select>
 
       <label>BPM range <span id="bpm-label"></span></label>
-      <input id="bpm-min" type="range" min="80" max="180" value="80" />
+      <input id="bpm-min" type="range" min="70" max="180" value="70" />
       <input id="bpm-max" type="range" min="80" max="180" value="180" />
 
       <label>Layout</label>
@@ -487,7 +491,7 @@
 
     const PLOT = {
       margin: { top: 36, right: 36, bottom: 52, left: 52 },
-      bpmDomain: [80, 180],
+      bpmDomain: [70, 180],
       energyDomain: [0, 1]
     };
 
@@ -515,7 +519,7 @@
       sources: new Set(["tracks", "to_curate"]),
       genre: "all",
       search: "",
-      bpmMin: 80,
+      bpmMin: 70,
       bpmMax: 180,
       zoomTransform: d3.zoomIdentity,
       zoomBehavior: null,
@@ -883,8 +887,16 @@
       document.getElementById("time-total").textContent = formatDuration(total);
     }
 
+    function formatBpm(track) {
+      if (track.bpm == null) return "? BPM";
+      if (track.bpm_octave_corrected && track.bpm_raw != null && Math.abs(track.bpm - track.bpm_raw) >= 4) {
+        return `${track.bpm} BPM (from ${track.bpm_raw})`;
+      }
+      return `${track.bpm} BPM`;
+    }
+
     function trackMetaLine(track, extra) {
-      return [track.artist, track.bpm ? `${track.bpm} BPM` : null, track.key || null, track.genre, extra]
+      return [track.artist, track.bpm != null ? formatBpm(track) : null, track.key || null, track.genre, extra]
         .filter(Boolean)
         .join(" · ");
     }
@@ -1128,7 +1140,13 @@
         });
 
       const node = viewport.append("g").attr("class", "nodes").selectAll("g").data(tracks).join("g")
-        .attr("class", d => `node ${d.source === "to_curate" ? "to-curate" : ""} ${d.id === state.playingId ? "playing" : ""}`)
+        .attr("class", d => {
+          const parts = ["node"];
+          if (d.source === "to_curate") parts.push("to-curate");
+          if (d.id === state.playingId) parts.push("playing");
+          if (d.bpm_octave_corrected) parts.push("bpm-corrected");
+          return parts.join(" ");
+        })
         .call(drag);
 
       node.append("circle")
@@ -1173,7 +1191,10 @@
         tooltip.innerHTML = `
           <strong>${d.title}</strong>
           <div class="row">${d.artist}</div>
-          <div class="row">${d.bpm ? d.bpm + " BPM" : "? BPM"} · ${d.key || "? key"} · energy ${(d.energy ?? 0.5).toFixed(2)}</div>
+          <div class="row">${formatBpm(d)} · ${d.key || "? key"} · energy ${(d.energy ?? 0.5).toFixed(2)}</div>
+          ${d.bpm_octave_corrected && d.bpm_raw != null && Math.abs(d.bpm - d.bpm_raw) >= 4
+            ? `<div class="row">Analyzer heard ${d.bpm_raw} BPM; placed using half-time grid.</div>`
+            : ""}
           <div class="row">${d.genre}${d.batch ? " / " + d.batch : ""} · ${formatDuration(d.duration_sec)}</div>
         `;
       }).on("mousemove", (event) => {

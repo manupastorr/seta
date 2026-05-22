@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-from analyze import analyze_track
+from analyze import ANALYSIS_VERSION, analyze_track
 from camelot import mix_score
 
 GRAPH_DIR = Path(__file__).resolve().parent
@@ -20,6 +20,35 @@ CURATE_ROOT = Path.home() / "Downloads" / "To Curate"
 CACHE_PATH = GRAPH_DIR / "cache.json"
 LIBRARY_PATH = GRAPH_DIR / "library.json"
 AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}
+# soundcloud-set-id writes short Shazam probe clips here — not library tracks.
+SET_ID_SAMPLE_DIR = "samples"
+SET_ID_SAMPLE_PREFIX = "sample_"
+
+
+def is_scannable_audio(path: Path) -> bool:
+    if path.suffix.lower() not in AUDIO_EXTS:
+        return False
+    if SET_ID_SAMPLE_DIR in path.parts and path.stem.startswith(SET_ID_SAMPLE_PREFIX):
+        return False
+    return True
+
+
+def discover_files(limit: int | None = None) -> list[Path]:
+    files: list[Path] = []
+    for root in (TRACKS_ROOT, CURATE_ROOT):
+        if not root.exists():
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            if "tools" in Path(dirpath).parts:
+                continue
+            for name in filenames:
+                path = Path(dirpath) / name
+                if is_scannable_audio(path):
+                    files.append(path)
+    files.sort()
+    if limit:
+        files = files[:limit]
+    return files
 
 
 def parse_filename(path: Path) -> tuple[str, str]:
@@ -74,7 +103,12 @@ def analyze_if_needed(path: Path, cache: dict) -> dict:
     key = str(path.resolve())
     sig = file_sig(path)
     cached = cache.get(key)
-    if cached and cached.get("mtime") == sig["mtime"] and cached.get("size") == sig["size"]:
+    if (
+        cached
+        and cached.get("mtime") == sig["mtime"]
+        and cached.get("size") == sig["size"]
+        and cached.get("analysis_version") == ANALYSIS_VERSION
+    ):
         return cached
 
     result = analyze_track(path)
@@ -88,23 +122,6 @@ def _analyze_worker(path_str: str) -> tuple[str, dict, dict]:
     sig = file_sig(path)
     result = analyze_track(path)
     return path_str, sig, result
-
-
-def discover_files(limit: int | None = None) -> list[Path]:
-    files: list[Path] = []
-    for root in (TRACKS_ROOT, CURATE_ROOT):
-        if not root.exists():
-            continue
-        for dirpath, _, filenames in os.walk(root):
-            if "tools" in Path(dirpath).parts:
-                continue
-            for name in filenames:
-                if Path(name).suffix.lower() in AUDIO_EXTS:
-                    files.append(Path(dirpath) / name)
-    files.sort()
-    if limit:
-        files = files[:limit]
-    return files
 
 
 def build_edges(tracks: list[dict], min_score: float = 0.55, max_edges: int = 12000) -> list[dict]:
@@ -166,6 +183,8 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                     "batch": meta["batch"],
                     "duration_sec": analysis.get("duration_sec"),
                     "bpm": analysis.get("bpm"),
+                    "bpm_raw": analysis.get("bpm_raw"),
+                    "bpm_octave_corrected": analysis.get("bpm_octave_corrected", False),
                     "key": analysis.get("key"),
                     "energy": analysis.get("energy", 0.5),
                     "analysis_error": analysis.get("analysis_error"),
@@ -189,6 +208,8 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                     "batch": meta["batch"],
                     "duration_sec": analysis.get("duration_sec"),
                     "bpm": analysis.get("bpm"),
+                    "bpm_raw": analysis.get("bpm_raw"),
+                    "bpm_octave_corrected": analysis.get("bpm_octave_corrected", False),
                     "key": analysis.get("key"),
                     "energy": analysis.get("energy", 0.5),
                     "analysis_error": analysis.get("analysis_error"),
