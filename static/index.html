@@ -3713,6 +3713,13 @@
       return "";
     }
 
+    function soundeoSearchUrl(track) {
+      const query = [track.artist, track.title].filter(Boolean).join(" ").trim();
+      if (!query) return null;
+      const q = query.split(/\s+/).map(encodeURIComponent).join("+");
+      return `https://soundeo.com/search?q=${q}&availableFilter=1`;
+    }
+
     function trackBadgeHtml(track) {
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : null;
       const keyText = track.key || "?";
@@ -3848,7 +3855,11 @@
       setEllipsisTitle(document.getElementById("now-artist"), artist);
       const badges = document.getElementById("now-badges");
       badges.hidden = false;
-      badges.innerHTML = trackBadgeHtml(track);
+      const soundeoUrl = soundeoSearchUrl(track);
+      badges.innerHTML = trackBadgeHtml(track)
+        + (soundeoUrl
+          ? `<a class="player-soundeo-link" href="${soundeoUrl}" target="_blank" rel="noopener noreferrer">Soundeo</a>`
+          : "");
       updatePlayButton();
     }
 
@@ -3866,6 +3877,7 @@
         .filter(Boolean)
         .map(part => `<span>${part}</span>`)
         .join("");
+      const soundeoUrl = soundeoSearchUrl(track);
 
       return `
         <div class="tooltip-title">${track.title || "Unknown title"}</div>
@@ -3873,6 +3885,7 @@
         <div class="tooltip-badges">${trackBadgeHtml(track)}</div>
         ${warn ? `<div class="tooltip-warn">${warn}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
+        ${soundeoUrl ? `<a class="tooltip-link" href="${soundeoUrl}" target="_blank" rel="noopener noreferrer">Search on Soundeo</a>` : ""}
       `;
     }
 
