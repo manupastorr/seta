@@ -12,7 +12,7 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 7
+ANALYSIS_VERSION = 8
 BPM_MIN = 70.0
 BPM_MAX = 180.0
 BPM_MAP_MIN = 70.0
@@ -364,6 +364,10 @@ def _detect_vocals(y: np.ndarray, sr: int) -> tuple[str, float | None]:
     if len(y) < sr * 8:
         return "unclear", None
 
+    vocal_window = sr * 45
+    if len(y) > vocal_window:
+        y = y[:vocal_window]
+
     y_harm, y_perc = librosa.effects.hpss(y, margin=2.0)
     harm_rms = float(np.sqrt(np.mean(y_harm**2)))
     perc_rms = float(np.sqrt(np.mean(y_perc**2)))
@@ -377,16 +381,13 @@ def _detect_vocals(y: np.ndarray, sr: int) -> tuple[str, float | None]:
     vocal_contrast = vocal_band - edge_band
 
     try:
-        _, _, voiced_probs = librosa.pyin(
+        f0 = librosa.yin(
             y_harm,
             fmin=librosa.note_to_hz("C2"),
             fmax=librosa.note_to_hz("C5"),
             sr=sr,
-            fill_na=0.0,
         )
-        voiced_strength = (
-            float(np.nanmean(voiced_probs)) if voiced_probs is not None else 0.0
-        )
+        voiced_strength = float(np.mean(np.isfinite(f0)))
     except Exception:
         voiced_strength = 0.0
 

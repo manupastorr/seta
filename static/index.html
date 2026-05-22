@@ -51,11 +51,171 @@
       background: rgba(255, 255, 255, 0.72);
       backdrop-filter: blur(12px);
       padding: 16px 14px 18px;
-      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-controls {
+      flex-shrink: 0;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .neighbor-panel {
+      flex: 0 0 0;
+      min-height: 0;
+      max-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      border-top: 1px solid transparent;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .neighbor-panel.is-visible {
+      flex: 1 1 0;
+      max-height: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      border-top-color: var(--panel-border);
+    }
+
+    .neighbor-panel-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .neighbor-panel-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .neighbor-panel-count {
+      font-size: 10px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .neighbor-list {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .neighbor-item {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 6px 8px;
+      align-items: center;
+      width: 100%;
+      padding: 7px 8px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
+      color: var(--text);
+    }
+
+    .neighbor-item:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .neighbor-item.is-active {
+      background: var(--accent-soft);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .neighbor-item.is-active:hover {
+      background: rgba(107, 79, 216, 0.17);
+    }
+
+    .neighbor-rank {
+      font-size: 10px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+
+    .neighbor-rank.is-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin: 0 auto;
+      font-size: 0;
+    }
+
+    .neighbor-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .neighbor-title {
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .neighbor-artist {
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .neighbor-meta {
+      display: inline-flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .neighbor-meta .neighbor-badge {
+      padding: 2px 6px;
+      font-size: 9px;
+    }
+
+    .neighbor-empty {
+      margin: 8px 0 0;
+      font-size: 11px;
+      line-height: 1.35;
+      color: var(--muted);
     }
 
     .sidebar-header {
       margin-bottom: 10px;
+      flex-shrink: 0;
     }
 
     h1 {
@@ -77,13 +237,14 @@
       display: flex;
       flex-wrap: nowrap;
       gap: 10px;
-      margin: 0 0 14px;
+      margin: 0 0 10px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--panel-border);
       min-height: 22px;
       font-size: 11px;
       color: var(--muted);
       line-height: 1.3;
+      flex-shrink: 0;
     }
 
     .status-item {
@@ -111,6 +272,11 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       margin: 12px 0 5px;
+    }
+
+    aside > label:first-of-type,
+    .sidebar-controls > label:first-of-type {
+      margin-top: 0;
     }
 
     input[type="search"], select, input[type="range"] {
@@ -506,22 +672,6 @@
     }
 
     .player-badges[hidden] {
-      display: none !important;
-    }
-
-    .player-note {
-      font-size: 10px;
-      color: var(--muted);
-      line-height: 1.35;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
-      flex: 1 1 auto;
-    }
-
-    .player-note[hidden],
-    .player-note.is-empty {
       display: none !important;
     }
 
@@ -932,6 +1082,12 @@
       color: #a84444;
     }
 
+    .tt-badge.mix-score {
+      background: rgba(38, 166, 154, 0.14);
+      border-color: rgba(38, 166, 154, 0.28);
+      color: #1b6f66;
+    }
+
     .tt-badge.vocals {
       background: rgba(38, 166, 154, 0.14);
       border-color: rgba(38, 166, 154, 0.3);
@@ -1091,42 +1247,53 @@
 
       <div class="library-status" id="library-status" aria-live="polite">–</div>
 
-      <label for="search">Search</label>
-      <input id="search" type="search" placeholder="Artist or title…" />
+      <div class="sidebar-controls">
+        <label for="search">Search</label>
+        <input id="search" type="search" placeholder="Artist or title…" />
 
-      <label>Source</label>
-      <div class="chip-row" id="source-filters">
-        <button class="chip active" data-source="all">All</button>
-        <button class="chip" data-source="tracks">Library</button>
-        <button class="chip" data-source="to_curate">Curate</button>
-      </div>
-
-      <label for="genre">Genre / batch</label>
-      <select id="genre"><option value="all">All genres</option></select>
-
-      <div class="bpm-range-header">
-        <label for="bpm-min">BPM range <span id="bpm-label"></span></label>
-        <button type="button" class="bpm-reset" id="bpm-reset" title="Reset BPM range" aria-label="Reset BPM range" disabled>↺</button>
-      </div>
-      <div class="bpm-range">
-        <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
-        <input id="bpm-min" type="range" min="70" max="180" value="70" />
-        <input id="bpm-max" type="range" min="70" max="180" value="180" />
-      </div>
-      <p class="sidebar-hint sidebar-hint-filters">Search, source, genre, and BPM filter here.</p>
-
-      <div class="sidebar-section sidebar-section-map">
-        <label>Map</label>
-        <div class="chip-row" id="view-controls">
-          <button class="chip active" data-layout="mix">Mix map</button>
-          <button class="chip" data-layout="explore">Mix links</button>
-          <button class="chip active" id="moments-toggle">Set moments</button>
+        <label>Source</label>
+        <div class="chip-row" id="source-filters">
+          <button class="chip active" data-source="all">All</button>
+          <button class="chip" data-source="tracks">Library</button>
+          <button class="chip" data-source="to_curate">Curate</button>
         </div>
-        <p class="sidebar-hint sidebar-hint-layout">Mix map = BPM × energy truth · Mix links = harmonic ties (positions approximate)</p>
-        <div class="map-actions">
-          <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
-          <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
+
+        <label for="genre">Genre / batch</label>
+        <select id="genre"><option value="all">All genres</option></select>
+
+        <div class="bpm-range-header">
+          <label for="bpm-min">BPM range <span id="bpm-label"></span></label>
+          <button type="button" class="bpm-reset" id="bpm-reset" title="Reset BPM range" aria-label="Reset BPM range" disabled>↺</button>
         </div>
+        <div class="bpm-range">
+          <div class="bpm-range-track" id="bpm-range-track" aria-hidden="true"><div class="bpm-range-fill" id="bpm-range-fill"></div></div>
+          <input id="bpm-min" type="range" min="70" max="180" value="70" />
+          <input id="bpm-max" type="range" min="70" max="180" value="180" />
+        </div>
+        <p class="sidebar-hint sidebar-hint-filters">Search, source, genre, and BPM filter here.</p>
+
+        <div class="sidebar-section sidebar-section-map">
+          <label>Map</label>
+          <div class="chip-row" id="view-controls">
+            <button class="chip active" data-layout="mix">Mix map</button>
+            <button class="chip" data-layout="explore">Mix links</button>
+            <button class="chip active" id="moments-toggle">Set moments</button>
+          </div>
+          <p class="sidebar-hint sidebar-hint-layout">Mix map = BPM × energy truth · Mix links = harmonic ties (positions approximate)</p>
+          <div class="map-actions">
+            <button class="secondary" id="neighbors-btn" title="Highlight mix neighbors">Neighbors</button>
+            <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="neighbor-panel" id="neighbor-panel" aria-hidden="true">
+        <div class="neighbor-panel-header">
+          <span class="neighbor-panel-title">Mix queue</span>
+          <span class="neighbor-panel-count" id="neighbor-panel-count"></span>
+        </div>
+        <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
+        <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
       </div>
     </aside>
 
@@ -1157,7 +1324,6 @@
           </div>
           <div class="player-subline">
             <div class="player-badges" id="now-badges" hidden></div>
-            <div class="player-note is-empty" id="now-note" hidden></div>
           </div>
         </div>
         <div class="player-scrub">
@@ -2261,6 +2427,108 @@
         : "Neighbors";
     }
 
+    function neighborTrackMetaHtml(track, score = null) {
+      const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
+      const keyText = track.key || "?";
+      const keyColor = camelotColor(track.key);
+      const badges = [
+        `<span class="tt-badge bpm neighbor-badge">${bpmVal}</span>`,
+        `<span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>`,
+      ];
+      if (score != null) {
+        badges.push(`<span class="tt-badge mix-score neighbor-badge">${Math.round(score * 100)}%</span>`);
+      }
+      return `<span class="neighbor-meta">${badges.join("")}</span>`;
+    }
+
+    function neighborListItemHtml(track, { anchor = false, rank = null, score = null, playing = false, selected = false } = {}) {
+      const rankClass = anchor ? "neighbor-rank is-dot" : "neighbor-rank";
+      const rankLabel = anchor ? "" : (rank != null ? String(rank) : "");
+      const isActive = anchor || playing || selected;
+      const classes = [
+        "neighbor-item",
+        isActive ? "is-active" : "",
+      ].filter(Boolean).join(" ");
+      const title = track.title || "Unknown title";
+      const artist = track.artist || "Unknown artist";
+      return `
+        <li>
+          <button type="button" class="${classes}" data-track-id="${track.id}" role="option" aria-selected="${isActive ? "true" : "false"}">
+            <span class="${rankClass}">${rankLabel}</span>
+            <span class="neighbor-main">
+              <span class="neighbor-title">${title}</span>
+              <span class="neighbor-artist">${artist}</span>
+            </span>
+            ${neighborTrackMetaHtml(track, score)}
+          </button>
+        </li>`;
+    }
+
+    function scrollNeighborItemIntoView(trackId) {
+      if (!trackId) return;
+      const item = document.querySelector(`.neighbor-item[data-track-id="${CSS.escape(trackId)}"]`);
+      item?.scrollIntoView({ block: "nearest" });
+    }
+
+    function updateNeighborList(tracks) {
+      const panel = document.getElementById("neighbor-panel");
+      const list = document.getElementById("neighbor-list");
+      const countEl = document.getElementById("neighbor-panel-count");
+      const emptyEl = document.getElementById("neighbor-empty");
+      if (!panel || !list || !countEl || !emptyEl) return;
+
+      const show = state.highlightNeighbors && !!state.selectedId;
+      panel.classList.toggle("is-visible", show);
+      panel.setAttribute("aria-hidden", show ? "false" : "true");
+      if (!show) {
+        list.innerHTML = "";
+        emptyEl.hidden = true;
+        countEl.textContent = "";
+        return;
+      }
+
+      const anchor = tracks.find(t => t.id === state.selectedId)
+        || state.data?.tracks.find(t => t.id === state.selectedId);
+      if (!anchor) {
+        panel.classList.remove("is-visible");
+        panel.setAttribute("aria-hidden", "true");
+        list.innerHTML = "";
+        countEl.textContent = "";
+        return;
+      }
+
+      const { list: neighbors } = mixNeighbors(state.selectedId, tracks);
+      countEl.textContent = neighbors.length
+        ? `${neighbors.length} mixable`
+        : "Anchor only";
+
+      if (!neighbors.length) {
+        list.innerHTML = neighborListItemHtml(anchor, {
+          anchor: true,
+          playing: state.playingId === anchor.id,
+          selected: true,
+        });
+        emptyEl.hidden = false;
+      } else {
+        emptyEl.hidden = true;
+        list.innerHTML = [
+          neighborListItemHtml(anchor, {
+            anchor: true,
+            playing: state.playingId === anchor.id,
+            selected: state.selectedId === anchor.id,
+          }),
+          ...neighbors.map((track, index) => neighborListItemHtml(track, {
+            rank: index + 1,
+            score: mixScore(anchor, track),
+            playing: state.playingId === track.id,
+            selected: state.selectedId === track.id,
+          })),
+        ].join("");
+      }
+
+      scrollNeighborItemIntoView(state.playingId || state.selectedId);
+    }
+
     function focusOnIds(ids) {
       const { plotLeft, plotWidth, plotHeight } = plotSize();
       const tracks = filteredTracks().filter(t => ids.has(t.id) && t.x != null && t.y != null);
@@ -2298,22 +2566,11 @@
     function updateLibraryStatus(tracks) {
       const el = document.getElementById("library-status");
       if (!el || !state.data) return;
-      const items = [
-        { value: tracks.length, label: "visible", primary: true },
-      ];
-      if (state.highlightNeighbors && state.selectedId) {
-        const { list } = mixNeighbors(state.selectedId, tracks);
-        items.push({
-          value: list.length,
-          label: list.length === 1 ? "neighbor" : "neighbors",
-          primary: true,
-        });
-      }
-      el.innerHTML = items.map(item => `
-        <span class="status-item${item.primary ? " is-primary" : ""}">
-          <span class="status-value">${item.value}</span>
-          ${item.label}
-        </span>`).join("");
+      el.innerHTML = `
+        <span class="status-item is-primary">
+          <span class="status-value">${tracks.length}</span>
+          visible
+        </span>`;
     }
 
     function updateStats(tracks) {
@@ -2405,10 +2662,6 @@
       setEllipsisTitle(document.getElementById("now-artist"), subtitle);
       document.getElementById("now-badges").hidden = true;
       document.getElementById("now-badges").innerHTML = "";
-      const noteEl = document.getElementById("now-note");
-      noteEl.hidden = true;
-      noteEl.classList.add("is-empty");
-      noteEl.textContent = "";
       audio.removeAttribute("src");
       audio.load();
       clearWaveform();
@@ -2424,7 +2677,7 @@
       });
     }
 
-    function updatePlayerTrack(track, note) {
+    function updatePlayerTrack(track) {
       const title = track.title || "Unknown title";
       const artist = track.artist || "Unknown artist";
       setEllipsisTitle(document.getElementById("now-title"), title);
@@ -2432,18 +2685,6 @@
       const badges = document.getElementById("now-badges");
       badges.hidden = false;
       badges.innerHTML = trackBadgeHtml(track);
-      const noteEl = document.getElementById("now-note");
-      if (note) {
-        noteEl.hidden = false;
-        noteEl.textContent = note;
-        noteEl.title = note;
-        noteEl.classList.remove("is-empty");
-      } else {
-        noteEl.hidden = true;
-        noteEl.textContent = "";
-        noteEl.removeAttribute("title");
-        noteEl.classList.add("is-empty");
-      }
       updatePlayButton();
     }
 
@@ -2814,20 +3055,7 @@
         updateMixLinks();
         updateLibraryStatus(tracks);
         updateNeighborsButton(active, neighbors ? neighbors.size : 0);
-
-        if (active && state.highlightNeighbors) {
-          const { list } = mixNeighbors(active, tracks);
-          const playing = state.data.tracks.find(t => t.id === (state.playingId || active));
-          if (playing) {
-            const note = list.length
-              ? `${list.length} mixable neighbor${list.length === 1 ? "" : "s"}`
-              : undefined;
-            updatePlayerTrack(playing, note);
-          }
-        } else if (state.playingId) {
-          const playing = state.data.tracks.find(t => t.id === state.playingId);
-          if (playing) updatePlayerTrack(playing);
-        }
+        updateNeighborList(tracks);
       }
 
       state.renderedTracks = tracks;
@@ -3088,6 +3316,13 @@
           syncPlayQueue();
         }
         state.refreshHighlight?.();
+      });
+
+      document.getElementById("neighbor-list").addEventListener("click", (event) => {
+        const btn = event.target.closest(".neighbor-item");
+        if (!btn?.dataset.trackId || !state.data) return;
+        const track = state.data.tracks.find(t => t.id === btn.dataset.trackId);
+        if (track) setNowPlaying(track);
       });
 
       updateNeighborsButton(null, 0);
