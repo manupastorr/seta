@@ -1160,7 +1160,7 @@
 
     const WAVEFORM_BARS = 200;
     const WAVEFORM_CACHE_MAX = 24;
-    const WAVEFORM_CACHE_VERSION = 2;
+    const WAVEFORM_CACHE_VERSION = 3;
     const SERATO_BAND = {
       low: [211, 47, 47],
       mid: [67, 160, 71],
@@ -1268,7 +1268,7 @@
           high[i] /= topBand;
         }
       }
-      return { v: WAVEFORM_CACHE_VERSION, peak, low, mid, high };
+      return { peak, low, mid, high };
     }
 
     function normalizeWaveformDisplay(values) {
@@ -1292,6 +1292,8 @@
     function trimPeakCache() {
       while (peakCache.size > WAVEFORM_CACHE_MAX) {
         const oldest = peakCache.keys().next().value;
+        const entry = peakCache.get(oldest);
+        if (entry?.blobUrl) URL.revokeObjectURL(entry.blobUrl);
         peakCache.delete(oldest);
       }
     }
@@ -1388,21 +1390,22 @@
       waveformCanvas.setAttribute("aria-valuetext", `${document.getElementById("time-current").textContent} of ${document.getElementById("time-total").textContent}`);
     }
 
-    async function ensureWaveform(trackId) {
+    async function loadTrackAudio(trackId, autoplay = true) {
       const gen = ++waveformLoadGen;
       waveformTrackId = trackId;
 
-      if (peakCache.has(trackId)) {
-        const cached = peakCache.get(trackId);
-        if (cached?.v !== WAVEFORM_CACHE_VERSION) {
-          peakCache.delete(trackId);
-        } else {
-          waveformData = cached;
-          waveformWrap.classList.remove("is-loading", "is-empty");
-          drawWaveform(getWaveformProgress());
-          return;
-        }
+      const cached = peakCache.get(trackId);
+      if (cached?.v === WAVEFORM_CACHE_VERSION && cached.blobUrl) {
+        waveformData = cached;
+        waveformLoading = false;
+        waveformWrap.classList.remove("is-loading", "is-empty");
+        audio.src = cached.blobUrl;
+        drawWaveform(getWaveformProgress());
+        if (autoplay) audio.play().catch(() => {});
+        return;
       }
+      if (cached?.blobUrl) URL.revokeObjectURL(cached.blobUrl);
+      peakCache.delete(trackId);
 
       waveformData = null;
       waveformLoading = true;
@@ -1415,15 +1418,25 @@
         if (!res.ok) throw new Error(`audio fetch ${res.status}`);
         const buf = await res.arrayBuffer();
         if (gen !== waveformLoadGen || state.playingId !== trackId) return;
+
+        const mime = res.headers.get("Content-Type") || "audio/wav";
+        const blobUrl = URL.createObjectURL(new Blob([buf], { type: mime }));
+        audio.src = blobUrl;
+        if (autoplay) audio.play().catch(() => {});
+
         await resumeAudioContext();
-        const decoded = await getAudioContext().decodeAudioData(buf.slice(0));
-        if (gen !== waveformLoadGen || state.playingId !== trackId) return;
-        const data = computeColoredPeaks(decoded, WAVEFORM_BARS);
+        const decoded = await getAudioContext().decodeAudioData(buf);
+        if (gen !== waveformLoadGen || state.playingId !== trackId) {
+          if (audio.src !== blobUrl) URL.revokeObjectURL(blobUrl);
+          return;
+        }
+        const peaks = computeColoredPeaks(decoded, WAVEFORM_BARS);
+        const data = { v: WAVEFORM_CACHE_VERSION, blobUrl, ...peaks };
         peakCache.set(trackId, data);
         trimPeakCache();
         waveformData = data;
       } catch (err) {
-        console.warn("waveform decode failed", err);
+        console.warn("track audio load failed", err);
         if (gen === waveformLoadGen && state.playingId === trackId) {
           waveformData = null;
         }
@@ -2344,10 +2357,8 @@
       state.playingId = track.id;
       updatePlayerTrack(track);
       waveformWrap.classList.remove("is-empty");
-      audio.src = `/api/audio/${track.id}`;
-      ensureWaveform(track.id);
+      loadTrackAudio(track.id, autoplay);
       resumeAudioContext().catch(() => {});
-      if (autoplay) audio.play().catch(() => {});
       updatePlayButton();
       updateSeekUi();
       state.refreshHighlight?.();

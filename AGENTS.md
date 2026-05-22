@@ -75,7 +75,7 @@ Map BPM domain: **70–180**. Bump `ANALYSIS_VERSION` after logic changes.
 ## UI conventions
 
 - Single frontend file: `static/index.html` (D3, no build step)
-- Player uses a Serato-style RGB canvas waveform (red bass / green mids / blue highs, client decode + peak cache); click or drag to seek
+- Player uses a Serato-style RGB canvas waveform (red bass / green mids / blue highs); one `fetch` per track feeds both `<audio>` (blob URL) and waveform decode; peaks + blob URL cached in memory (24 tracks)
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes
 - Set-moment clouds are fixed BPM×energy zones (visual only): dance-floor arc plus **Close eyes**, **Chill groove**, and **Slow burn** (organic pulse at slow BPM); toggle **Set moments**
 - Keep changes minimal; no new dependencies without good reason
