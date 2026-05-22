@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan tracks + To Curate, analyze audio, build library.json for the graph UI."""
+"""Scan tracks + To Curate, analyze audio, build library.json for the Seta UI."""
 
 from __future__ import annotations
 
@@ -14,11 +14,11 @@ from pathlib import Path
 from camelot import mix_score
 from config import curate_root, tracks_root
 
-GRAPH_DIR = Path(__file__).resolve().parent
+APP_DIR = Path(__file__).resolve().parent
 TRACKS_ROOT = tracks_root()
 CURATE_ROOT = curate_root()
-CACHE_PATH = GRAPH_DIR / "cache.json"
-LIBRARY_PATH = GRAPH_DIR / "library.json"
+CACHE_PATH = APP_DIR / "cache.json"
+LIBRARY_PATH = APP_DIR / "library.json"
 AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}
 # soundcloud-set-id writes short Shazam probe clips here — not library tracks.
 SET_ID_SAMPLE_DIR = "samples"
@@ -260,7 +260,7 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Scan DJ library for graph view")
+    parser = argparse.ArgumentParser(description="Scan DJ library for Seta")
     parser.add_argument("--limit", type=int, default=None, help="Only scan first N files")
     parser.add_argument("--workers", type=int, default=max(2, os.cpu_count() or 4) - 1)
     parser.add_argument("--skip-edges", action="store_true")

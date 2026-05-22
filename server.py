@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local server for the track graph UI and audio streaming."""
+"""Local server for the Seta UI and audio streaming."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ from flask import Flask, Response, abort, jsonify, send_from_directory
 
 from config import allowed_roots, port, tracks_root
 
-GRAPH_DIR = Path(__file__).resolve().parent
-STATIC_DIR = GRAPH_DIR / "static"
-LIBRARY_PATH = GRAPH_DIR / "library.json"
+APP_DIR = Path(__file__).resolve().parent
+STATIC_DIR = APP_DIR / "static"
+LIBRARY_PATH = APP_DIR / "library.json"
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 TRACK_INDEX: dict[str, dict] = {}
@@ -61,7 +61,7 @@ def api_audio(track_id: str) -> Response:
 def main() -> None:
     load_library()
     listen_port = port()
-    print(f"Track graph: http://127.0.0.1:{listen_port}")
+    print(f"Seta: http://127.0.0.1:{listen_port}")
     print(f"Library: {LIBRARY_PATH}")
     print(f"Tracks root: {tracks_root()}")
     app.run(host="127.0.0.1", port=listen_port, debug=False, threaded=True)

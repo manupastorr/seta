@@ -1,5 +1,5 @@
 /**
- * Pure play-queue helpers for Track Graph (tested via Node and used in the browser).
+ * Pure play-queue helpers for Seta (tested via Node and used in the browser).
  */
 (function (root, factory) {
   const api = factory();

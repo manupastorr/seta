@@ -32,5 +32,5 @@ if [[ ${#SCAN_ARGS[@]} -gt 0 && " ${SCAN_ARGS[*]} " == *" --skip-edges "* ]]; th
 fi
 "$PY" scan_library.py "${SCAN_ARGS[@]}"
 
-echo "Starting graph server..."
+echo "Starting Seta..."
 exec "$PY" server.py

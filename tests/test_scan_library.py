@@ -204,7 +204,7 @@ class DiscoverFilesTests(unittest.TestCase):
         good = self.tracks_root / "House & Deep House" / "Artist - Song.wav"
         good.parent.mkdir(parents=True)
         good.touch()
-        tools_file = self.tracks_root / "tools" / "graph" / "hidden.wav"
+        tools_file = self.tracks_root / "tools" / "seta" / "hidden.wav"
         tools_file.parent.mkdir(parents=True)
         tools_file.touch()
         sample_clip = self.tracks_root / "samples" / "sample_xyz.wav"
@@ -284,7 +284,7 @@ class LibrarySanityTests(unittest.TestCase):
         self.assertTrue(any("score out of range" in e for e in errors))
 
     def test_existing_library_json_if_present(self) -> None:
-        library_path = scan_library.GRAPH_DIR / "library.json"
+        library_path = scan_library.APP_DIR / "library.json"
         if not library_path.exists():
             self.skipTest("library.json not generated locally")
         library = json.loads(library_path.read_text())

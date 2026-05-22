@@ -1,4 +1,4 @@
-# Track Graph
+# Seta 🍄
 
 Local web app to browse a DJ library on a **BPM × energy** map, with **Camelot** mix hints, playback, and set-moment overlays. BPM, energy, and key come from local analysis (~90s sample per file)—useful for exploration, not a substitute for Rekordbox when confidence is low.
 
@@ -10,8 +10,8 @@ Default scan folders (override with `.env`):
 ## Quick start
 
 ```bash
-git clone https://github.com/manupastorr/track-graph.git
-cd track-graph
+git clone https://github.com/manupastorr/seta.git
+cd seta
 ./start.sh
 ```
 
@@ -31,13 +31,13 @@ Each person runs their **own copy** with **their own music folders**. The app do
 
 ### 1. GitHub access
 
-Repo owner: **Settings → Collaborators → Add people** on [github.com/manupastorr/track-graph](https://github.com/manupastorr/track-graph).
+Repo owner: **Settings → Collaborators → Add people** on [github.com/manupastorr/seta](https://github.com/manupastorr/seta).
 
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/manupastorr/track-graph.git
-cd track-graph
+git clone https://github.com/manupastorr/seta.git
+cd seta
 cp .env.example .env   # optional — only if paths differ from defaults
 ./start.sh
 ```
@@ -67,9 +67,9 @@ cp .env.example .env
 Edit `.env`:
 
 ```bash
-TRACK_GRAPH_TRACKS_ROOT=~/Music/tracks
-TRACK_GRAPH_CURATE_ROOT=~/Downloads/To Curate
-TRACK_GRAPH_PORT=8765
+SETA_TRACKS_ROOT=~/Music/tracks
+SETA_CURATE_ROOT=~/Downloads/To Curate
+SETA_PORT=8765
 ```
 
 Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.json` (not in git).
@@ -96,7 +96,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 | `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy, vocals hint, Serato-style waveform peaks (full track) |
 | `camelot.py` | Wheel colors + mix compatibility scoring |
 | `server.py` | Flask: UI, `/api/library`, audio streaming |
-| `static/index.html` | Single-page D3 graph + player |
+| `static/index.html` | Single-page D3 map + player |
 
 ### Layouts
 
@@ -128,7 +128,7 @@ Not indexed as library tracks:
 
 ## Library organization (Manuel’s setup)
 
-Genre folders, sorting rules, and curation workflow for the main library live in a separate notes file at `~/Music/tracks/AGENTS.md`. This tool only **reads** audio folders; it does not move or classify files.
+Genre folders, sorting rules, and curation workflow for the main library live in a separate notes file at `~/Music/tracks/AGENTS.md`. Seta only **reads** audio folders; it does not move or classify files.
 
 ## Requirements
 

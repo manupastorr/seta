@@ -1,4 +1,4 @@
-"""Local paths and settings for track-graph (override via env or .env)."""
+"""Local paths and settings for Seta (override via env or .env)."""
 
 from __future__ import annotations
 
@@ -35,11 +35,11 @@ def _path_from_env(name: str, default: Path) -> Path:
 
 
 def tracks_root() -> Path:
-    return _path_from_env("TRACK_GRAPH_TRACKS_ROOT", DEFAULT_TRACKS_ROOT)
+    return _path_from_env("SETA_TRACKS_ROOT", DEFAULT_TRACKS_ROOT)
 
 
 def curate_root() -> Path:
-    return _path_from_env("TRACK_GRAPH_CURATE_ROOT", DEFAULT_CURATE_ROOT)
+    return _path_from_env("SETA_CURATE_ROOT", DEFAULT_CURATE_ROOT)
 
 
 def allowed_roots() -> tuple[Path, ...]:
@@ -47,4 +47,4 @@ def allowed_roots() -> tuple[Path, ...]:
 
 
 def port() -> int:
-    return int(os.environ.get("TRACK_GRAPH_PORT", DEFAULT_PORT))
+    return int(os.environ.get("SETA_PORT", DEFAULT_PORT))

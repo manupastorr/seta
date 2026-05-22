@@ -1,8 +1,8 @@
-# Track Graph — agent notes
+# Seta 🍄 — agent notes
 
 ## Scope
 
-This repo is the **graph browser tool** only (`tools/graph/`). It does not own track sorting, genre folders, or Rekordbox workflows.
+This repo is the **Seta map browser** only (`tools/seta/`). It does not own track sorting, genre folders, or Rekordbox workflows.
 
 For moving/sorting/classifying audio files, follow the parent library rules:
 
@@ -14,9 +14,9 @@ Defaults (override with `.env` or env vars):
 
 | Variable | Default |
 |----------|---------|
-| `TRACK_GRAPH_TRACKS_ROOT` | `~/Music/tracks` |
-| `TRACK_GRAPH_CURATE_ROOT` | `~/Downloads/To Curate` |
-| `TRACK_GRAPH_PORT` | `8765` |
+| `SETA_TRACKS_ROOT` | `~/Music/tracks` |
+| `SETA_CURATE_ROOT` | `~/Downloads/To Curate` |
+| `SETA_PORT` | `8765` |
 
 Copy `.env.example` → `.env` per machine. Do not commit `.env`.
 
@@ -73,7 +73,7 @@ UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confiden
 
 Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars, full-file analysis at scan).
 
-Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a library-wide adaptive floor (p3 of scanned energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. The axis label shows the active range (e.g. `Intensity 0.52–1.0 →`). Set zones that sit below the visible band are dimmed on the map and marked with **↓** in the legend. Set-zone filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
+Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a library-wide adaptive floor (p3 of scanned energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. Set-zone filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
 
 ## UI conventions
 
@@ -90,4 +90,4 @@ Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.js
 ## Git
 
 - Commit app code only (`library.json`, `cache.json`, audio stay ignored)
-- Remote: `manupastorr/track-graph` on GitHub
+- Remote: `manupastorr/seta` on GitHub
