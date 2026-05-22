@@ -12,7 +12,9 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 8
+ANALYSIS_VERSION = 9
+WAVEFORM_BARS = 400
+WAVEFORM_VERSION = 1
 BPM_MIN = 70.0
 BPM_MAX = 180.0
 BPM_MAP_MIN = 70.0
@@ -35,10 +37,12 @@ MINOR_PROFILE = np.array(
 )
 
 
-def _load_mono(path: Path) -> tuple[np.ndarray, int]:
+def _load_mono(path: Path, *, max_seconds: float | None = ANALYSIS_SECONDS) -> tuple[np.ndarray, int]:
     try:
         info = sf.info(path)
-        frames = min(info.frames, int(ANALYSIS_SECONDS * info.samplerate))
+        frames = info.frames
+        if max_seconds is not None:
+            frames = min(frames, int(max_seconds * info.samplerate))
         audio, sr = sf.read(path, frames=frames, always_2d=True)
         mono = np.mean(audio, axis=1)
         if sr != TARGET_SR:
@@ -46,8 +50,9 @@ def _load_mono(path: Path) -> tuple[np.ndarray, int]:
             sr = TARGET_SR
         return mono.astype(np.float32), sr
     except Exception:
+        duration = max_seconds
         mono, sr = librosa.load(
-            path, sr=TARGET_SR, mono=True, duration=ANALYSIS_SECONDS
+            path, sr=TARGET_SR, mono=True, duration=duration
         )
         return mono, sr
 
@@ -406,15 +411,87 @@ def _detect_vocals(y: np.ndarray, sr: int) -> tuple[str, float | None]:
         + 0.25 * _clip01((2.0 - vocal_contrast) / 2.0)
     )
 
-    if vocal_score >= 0.52 and vocal_score >= inst_score + 0.12:
-        conf = _clip01(0.45 + (vocal_score - 0.52) * 1.1)
+    if (
+        vocal_score >= 0.58
+        and vocal_score >= inst_score + 0.15
+        and voiced_strength >= 0.2
+        and vocal_contrast >= 2.0
+    ):
+        conf = _clip01(0.45 + (vocal_score - 0.58) * 1.2)
         return "yes", round(conf, 3)
-    if inst_score >= 0.50 and inst_score >= vocal_score + 0.12:
-        conf = _clip01(0.45 + (inst_score - 0.50) * 1.1)
+    if inst_score >= 0.52 and inst_score >= vocal_score + 0.15:
+        conf = _clip01(0.45 + (inst_score - 0.52) * 1.1)
         return "no", round(conf, 3)
     spread = abs(vocal_score - inst_score)
     conf = round(_clip01(0.35 + spread * 0.5), 3)
     return "unclear", conf
+
+
+def _normalize_waveform_display(values: np.ndarray) -> None:
+    sorted_vals = np.sort(values)
+    n = len(sorted_vals)
+    if n == 0:
+        return
+    p5 = sorted_vals[int(n * 0.05)]
+    p95 = sorted_vals[int(n * 0.95)]
+    span = max(float(p95 - p5), 1e-6)
+    floor = 0.05
+    gamma = 0.62
+    for i in range(n):
+        v = (float(values[i]) - p5) / span
+        v = _clip01(v)
+        v = v**gamma
+        values[i] = floor + v * (1.0 - floor)
+
+
+def _compute_waveform_peaks(y: np.ndarray, sr: int, bar_count: int = WAVEFORM_BARS) -> dict | None:
+    if len(y) < sr:
+        return None
+
+    per_bar = max(1, len(y) // bar_count)
+    peak = np.zeros(bar_count, dtype=np.float32)
+    low = np.zeros(bar_count, dtype=np.float32)
+    mid = np.zeros(bar_count, dtype=np.float32)
+    high = np.zeros(bar_count, dtype=np.float32)
+    alpha_low = 1 - np.exp((-2 * np.pi * 280) / sr)
+    alpha_high = 1 - np.exp((-2 * np.pi * 4200) / sr)
+    lp = 0.0
+    hp = 0.0
+
+    for j, x in enumerate(y):
+        bar = min(bar_count - 1, j // per_bar)
+        peak[bar] += x * x
+        lp += alpha_low * (x - lp)
+        low_sig = lp
+        hp += alpha_high * (x - hp)
+        high_sig = x - hp
+        mid_sig = x - low_sig - high_sig
+        low[bar] += low_sig * low_sig
+        mid[bar] += mid_sig * mid_sig
+        high[bar] += high_sig * high_sig
+
+    for i in range(bar_count):
+        n = min(per_bar, len(y) - i * per_bar)
+        peak[i] = np.sqrt(peak[i] / n)
+        low[i] = np.sqrt(low[i] / n)
+        mid[i] = np.sqrt(mid[i] / n)
+        high[i] = np.sqrt(high[i] / n)
+
+    _normalize_waveform_display(peak)
+    top_band = float(np.max(low + mid + high))
+    if top_band > 0:
+        low /= top_band
+        mid /= top_band
+        high /= top_band
+
+    return {
+        "version": WAVEFORM_VERSION,
+        "bars": bar_count,
+        "peak": [round(float(v), 5) for v in peak],
+        "low": [round(float(v), 5) for v in low],
+        "mid": [round(float(v), 5) for v in mid],
+        "high": [round(float(v), 5) for v in high],
+    }
 
 
 def _detect_energy(y: np.ndarray, sr: int) -> float:
@@ -468,10 +545,16 @@ def analyze_track(path: Path) -> dict:
             "energy": 0.5,
             "vocals": "unclear",
             "vocals_confidence": None,
+            "waveform": None,
             "analysis_error": str(exc),
         }
 
+    y_full, sr_full = _load_mono(path, max_seconds=None)
+    y = y_full[: int(ANALYSIS_SECONDS * sr_full)] if len(y_full) > ANALYSIS_SECONDS * sr_full else y_full
+    sr = sr_full
+
     vocals, vocals_confidence = _detect_vocals(y, sr)
+    waveform = _compute_waveform_peaks(y_full, sr_full)
     bpm, bpm_raw, bpm_octave_corrected, onset_env, tempo_candidates = _detect_bpm(y, sr)
     bpm_source = "analysis"
 
@@ -496,5 +579,6 @@ def analyze_track(path: Path) -> dict:
         "energy": _detect_energy(y, sr),
         "vocals": vocals,
         "vocals_confidence": vocals_confidence,
+        "waveform": waveform,
         "analysis_error": None,
     }

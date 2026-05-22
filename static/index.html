@@ -1627,7 +1627,8 @@
 
     const WAVEFORM_BARS = 400;
     const WAVEFORM_CACHE_MAX = 24;
-    const WAVEFORM_CACHE_VERSION = 4;
+    const WAVEFORM_CACHE_VERSION = 5;
+    const LIBRARY_WAVEFORM_VERSION = 1;
     const SERATO_BAND = {
       low: [211, 47, 47],
       mid: [67, 160, 71],
@@ -1865,9 +1866,31 @@
       waveformCanvas.setAttribute("aria-valuetext", `${document.getElementById("time-current").textContent} of ${document.getElementById("time-total").textContent}`);
     }
 
+    function findTrackById(trackId) {
+      return state.data?.tracks?.find(t => t.id === trackId) ?? null;
+    }
+
+    function waveformFromLibrary(track) {
+      if (
+        !track?.waveform_peak?.length
+        || track.waveform_version !== LIBRARY_WAVEFORM_VERSION
+      ) {
+        return null;
+      }
+      return {
+        v: WAVEFORM_CACHE_VERSION,
+        peak: Float32Array.from(track.waveform_peak),
+        low: Float32Array.from(track.waveform_low),
+        mid: Float32Array.from(track.waveform_mid),
+        high: Float32Array.from(track.waveform_high),
+      };
+    }
+
     async function loadTrackAudio(trackId, autoplay = true) {
       const gen = ++waveformLoadGen;
       waveformTrackId = trackId;
+      const track = findTrackById(trackId);
+      const libraryWaveform = waveformFromLibrary(track);
 
       const cached = peakCache.get(trackId);
       if (cached?.v === WAVEFORM_CACHE_VERSION && cached.blobUrl) {
@@ -1882,11 +1905,17 @@
       if (cached?.blobUrl) URL.revokeObjectURL(cached.blobUrl);
       peakCache.delete(trackId);
 
-      waveformData = null;
-      waveformLoading = true;
-      waveformWrap.classList.add("is-loading");
+      if (libraryWaveform) {
+        waveformData = libraryWaveform;
+        waveformLoading = false;
+        waveformWrap.classList.remove("is-loading");
+      } else {
+        waveformData = null;
+        waveformLoading = true;
+        waveformWrap.classList.add("is-loading");
+      }
       waveformWrap.classList.remove("is-empty");
-      drawWaveform(0);
+      drawWaveform(getWaveformProgress());
 
       try {
         const res = await fetch(`/api/audio/${encodeURIComponent(trackId)}`);
@@ -1899,13 +1928,16 @@
         audio.src = blobUrl;
         if (autoplay) audio.play().catch(() => {});
 
-        await resumeAudioContext();
-        const decoded = await getAudioContext().decodeAudioData(buf);
-        if (gen !== waveformLoadGen || state.playingId !== trackId) {
-          if (audio.src !== blobUrl) URL.revokeObjectURL(blobUrl);
-          return;
+        let peaks = libraryWaveform;
+        if (!peaks) {
+          await resumeAudioContext();
+          const decoded = await getAudioContext().decodeAudioData(buf);
+          if (gen !== waveformLoadGen || state.playingId !== trackId) {
+            if (audio.src !== blobUrl) URL.revokeObjectURL(blobUrl);
+            return;
+          }
+          peaks = computeColoredPeaks(decoded, WAVEFORM_BARS);
         }
-        const peaks = computeColoredPeaks(decoded, WAVEFORM_BARS);
         const data = { v: WAVEFORM_CACHE_VERSION, blobUrl, ...peaks };
         peakCache.set(trackId, data);
         trimPeakCache();

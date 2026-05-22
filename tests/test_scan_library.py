@@ -37,7 +37,15 @@ REQUIRED_TRACK_FIELDS = {
     "analysis_error",
 }
 
-OPTIONAL_TRACK_FIELDS = {"vocals", "vocals_confidence"}
+OPTIONAL_TRACK_FIELDS = {
+    "vocals",
+    "vocals_confidence",
+    "waveform_version",
+    "waveform_peak",
+    "waveform_low",
+    "waveform_mid",
+    "waveform_high",
+}
 
 
 def library_errors(library: dict) -> list[str]:

@@ -17,6 +17,12 @@ cd track-graph
 
 `./start.sh` scans then starts the server. Open the URL printed in the terminal (default **http://127.0.0.1:8765**). Cached analysis is reused when files are unchanged.
 
+For a faster scan after adding only a few tracks (skips mix-edge rebuild):
+
+```bash
+./start.sh --quick
+```
+
 First run creates a local `.venv` and installs dependencies from `requirements.txt`.
 
 ## Share with someone else (separate Mac, own tracks)
@@ -87,7 +93,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 |-------|------|
 | `config.py` | Paths and port from env / `.env` |
 | `scan_library.py` | Walks audio folders, analyzes tracks, writes `library.json` + mix edges |
-| `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy estimates (librosa, ~90s sample) |
+| `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy, vocals hint, Serato-style waveform peaks (full track) |
 | `camelot.py` | Wheel colors + mix compatibility scoring |
 | `server.py` | Flask: UI, `/api/library`, audio streaming |
 | `static/index.html` | Single-page D3 graph + player |

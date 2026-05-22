@@ -18,8 +18,19 @@ if [[ ! -x "$PY" ]]; then
 fi
 
 cd "$ROOT"
+SCAN_ARGS=()
+for arg in "$@"; do
+  if [[ "$arg" == "--quick" ]]; then
+    SCAN_ARGS+=(--skip-edges)
+  else
+    SCAN_ARGS+=("$arg")
+  fi
+done
 echo "Scanning library (cached analysis reused when possible)..."
-"$PY" scan_library.py "$@"
+if [[ ${#SCAN_ARGS[@]} -gt 0 && " ${SCAN_ARGS[*]} " == *" --skip-edges "* ]]; then
+  echo "Quick scan: skipping mix-edge rebuild"
+fi
+"$PY" scan_library.py "${SCAN_ARGS[@]}"
 
 echo "Starting graph server..."
 exec "$PY" server.py

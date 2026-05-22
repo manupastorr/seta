@@ -89,6 +89,19 @@ def file_sig(path: Path) -> dict:
     return {"mtime": int(stat.st_mtime), "size": stat.st_size}
 
 
+def waveform_track_fields(analysis: dict) -> dict:
+    wf = analysis.get("waveform")
+    if not wf or not wf.get("peak"):
+        return {}
+    return {
+        "waveform_version": wf.get("version"),
+        "waveform_peak": wf.get("peak"),
+        "waveform_low": wf.get("low"),
+        "waveform_mid": wf.get("mid"),
+        "waveform_high": wf.get("high"),
+    }
+
+
 def load_cache() -> dict:
     if CACHE_PATH.exists():
         return json.loads(CACHE_PATH.read_text())
@@ -196,6 +209,7 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                     "vocals": analysis.get("vocals"),
                     "vocals_confidence": analysis.get("vocals_confidence"),
                     "analysis_error": analysis.get("analysis_error"),
+                    **waveform_track_fields(analysis),
                 }
             )
     else:
@@ -225,6 +239,7 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
                     "vocals": analysis.get("vocals"),
                     "vocals_confidence": analysis.get("vocals_confidence"),
                     "analysis_error": analysis.get("analysis_error"),
+                    **waveform_track_fields(analysis),
                 }
             )
         save_cache(cache)
