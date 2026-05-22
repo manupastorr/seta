@@ -81,6 +81,65 @@
       width: 100%;
     }
 
+    .bpm-range {
+      position: relative;
+      height: 28px;
+      margin-top: 2px;
+    }
+
+    .bpm-range input[type="range"] {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 100%;
+      margin: 0;
+      pointer-events: none;
+      background: transparent;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .bpm-range input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .bpm-range input[type="range"]::-moz-range-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .bpm-range input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      pointer-events: auto;
+      width: 16px;
+      height: 16px;
+      margin-top: -6px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: var(--accent);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+    }
+
+    .bpm-range input[type="range"]::-moz-range-thumb {
+      pointer-events: auto;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: var(--accent);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+    }
+
+    .bpm-range input[type="range"]#bpm-max {
+      z-index: 2;
+    }
+
     input[type="search"], select {
       background: var(--panel);
       border: 1px solid var(--panel-border);
@@ -597,8 +656,10 @@
       <select id="genre"><option value="all">All genres</option></select>
 
       <label>BPM range <span id="bpm-label"></span></label>
-      <input id="bpm-min" type="range" min="70" max="180" value="70" />
-      <input id="bpm-max" type="range" min="80" max="180" value="180" />
+      <div class="bpm-range">
+        <input id="bpm-min" type="range" min="70" max="180" value="70" />
+        <input id="bpm-max" type="range" min="70" max="180" value="180" />
+      </div>
 
       <label>Layout</label>
       <div class="chip-row" id="layout-modes">
@@ -1724,16 +1785,28 @@
         document.getElementById("bpm-label").textContent = `${state.bpmMin}–${state.bpmMax}`;
       }
 
-      ["bpm-min", "bpm-max"].forEach(id => {
-        document.getElementById(id).addEventListener("input", e => {
-          state.bpmMin = Number(document.getElementById("bpm-min").value);
-          state.bpmMax = Number(document.getElementById("bpm-max").value);
-          if (state.bpmMin > state.bpmMax) {
-            [state.bpmMin, state.bpmMax] = [state.bpmMax, state.bpmMin];
+      function syncBpmInputs() {
+        const minInput = document.getElementById("bpm-min");
+        const maxInput = document.getElementById("bpm-max");
+        let min = Number(minInput.value);
+        let max = Number(maxInput.value);
+        if (min > max) {
+          if (document.activeElement === minInput) {
+            max = min;
+          } else {
+            min = max;
           }
-          updateBpmLabel();
-          renderGraph();
-        });
+        }
+        state.bpmMin = min;
+        state.bpmMax = max;
+        minInput.value = String(min);
+        maxInput.value = String(max);
+        updateBpmLabel();
+        renderGraph();
+      }
+
+      ["bpm-min", "bpm-max"].forEach(id => {
+        document.getElementById(id).addEventListener("input", syncBpmInputs);
       });
       updateBpmLabel();
 
