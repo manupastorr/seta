@@ -6,6 +6,7 @@
   <title>Seta 🍄</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="/static/playback.js"></script>
+  <script src="/static/mixLinks.js"></script>
   <style>
     :root {
       --bg: #ffffff;
@@ -869,6 +870,26 @@
       background: var(--accent-soft);
       border-color: rgba(107, 79, 216, 0.32);
       color: var(--accent);
+    }
+
+    .chip:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .chip:disabled:hover {
+      background: var(--panel);
+      border-color: var(--panel-border);
+      color: var(--muted);
+    }
+
+    .mix-links-note {
+      flex: 0 1 auto;
+      align-self: center;
+      font-size: 10px;
+      line-height: 1.2;
+      color: var(--muted);
+      white-space: nowrap;
     }
 
     .chip.active:hover {
@@ -1838,7 +1859,8 @@
         <div class="filter-group filter-group-map">
           <div class="chip-row" id="view-controls">
             <button class="chip active" data-layout="mix">Mix map</button>
-            <button class="chip" data-layout="explore">Mix links</button>
+            <button class="chip" data-layout="explore" id="layout-explore-btn">Mix links</button>
+            <span class="mix-links-note" id="mix-links-note" hidden>Mix links not built for this scan</span>
           </div>
           <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
@@ -3328,9 +3350,39 @@
       return typeof endpoint === "object" && endpoint != null ? endpoint.id : endpoint;
     }
 
+    function libraryHasMixEdges() {
+      return MixLinksUi.libraryHasMixEdges(state.data);
+    }
+
+    function setLayoutChipActive(layout) {
+      document.querySelectorAll("#view-controls .chip[data-layout]").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.layout === layout);
+      });
+    }
+
+    function syncMixLinksAvailability() {
+      const hasEdges = libraryHasMixEdges();
+      const exploreBtn = document.getElementById("layout-explore-btn");
+      const note = document.getElementById("mix-links-note");
+      if (exploreBtn) {
+        exploreBtn.disabled = !hasEdges;
+        exploreBtn.title = hasEdges ? "" : "Mix links not built for this scan";
+      }
+      if (note) note.hidden = hasEdges;
+
+      const normalized = MixLinksUi.layoutWithMixEdges(state.layout, hasEdges);
+      if (normalized !== state.layout) {
+        state.layout = normalized;
+        state.prevLayout = normalized;
+        setLayoutChipActive(normalized);
+      }
+    }
+
     function visibleEdgeSet(trackIds) {
       const ids = new Set(trackIds.map(t => t.id));
-      return state.data.edges.filter(e => {
+      const edges = state.data?.edges;
+      if (!Array.isArray(edges)) return [];
+      return edges.filter(e => {
         const src = edgeEndpointId(e.source);
         const tgt = edgeEndpointId(e.target);
         return ids.has(src) && ids.has(tgt);
@@ -4746,6 +4798,7 @@
       state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
       populateGenres(state.data.tracks);
       restoreFilterState();
+      syncMixLinksAvailability();
       syncUiLayout();
       renderGraph();
 
@@ -4807,8 +4860,8 @@
 
       document.querySelectorAll("#view-controls .chip[data-layout]").forEach(chip => {
         chip.addEventListener("click", () => {
-          document.querySelectorAll("#view-controls .chip[data-layout]").forEach(c => c.classList.remove("active"));
-          chip.classList.add("active");
+          if (chip.disabled) return;
+          setLayoutChipActive(chip.dataset.layout);
           state.layout = chip.dataset.layout;
           renderGraph();
         });
