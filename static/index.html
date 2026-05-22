@@ -402,9 +402,9 @@
       align-items: center;
       width: 100%;
       padding: 6px 4px;
-      border: none;
+      border: 1px solid rgba(226, 226, 234, 0.9);
       border-radius: 8px;
-      background: transparent;
+      background: rgba(255, 255, 255, 0.55);
       text-align: left;
       cursor: pointer;
       font: inherit;
@@ -412,16 +412,19 @@
     }
 
     .neighbor-item:hover {
-      background: rgba(0, 0, 0, 0.04);
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(107, 79, 216, 0.22);
     }
 
     .neighbor-item.is-active {
       background: var(--accent-soft);
+      border-color: rgba(107, 79, 216, 0.42);
       box-shadow: inset 2px 0 0 var(--accent);
     }
 
     .neighbor-item.is-active:hover {
       background: rgba(107, 79, 216, 0.17);
+      border-color: rgba(107, 79, 216, 0.5);
     }
 
     .neighbor-item.search-result-item {
