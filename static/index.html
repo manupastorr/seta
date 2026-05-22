@@ -1597,6 +1597,16 @@
       pointer-events: none;
     }
 
+    .moment-label.below-view {
+      fill: rgba(30, 30, 45, 0.22);
+      font-size: 8px;
+    }
+
+    .moment-legend-label.below-view::before {
+      content: "↓ ";
+      color: var(--muted);
+    }
+
     .player-shortcuts-hint {
       margin-left: auto;
       font-size: 10px;
@@ -2767,15 +2777,22 @@
         .attr("stdDeviation", 12);
     }
 
+    function momentBelowDisplayView(moment) {
+      const [displayLo] = energyDisplayDomain();
+      return moment.energy[1] < displayLo + 0.02;
+    }
+
     function drawSetMoments(container, x, y, plotWidth, plotHeight) {
       const layer = container.append("g").attr("class", "set-moments");
-      const tickBandTop = plotHeight - 24;
+      const tickBandTop = plotHeight - PLOT.inset.bottom - 8;
       const filtering = state.activeMoments.size > 0;
 
       SET_MOMENTS.forEach(moment => {
         const { cx, cy, rx, ry } = momentEllipse(moment, x, y);
         const active = state.activeMoments.has(moment.id);
-        const fillOpacity = filtering ? (active ? 0.18 : 0.035) : 0.09;
+        const belowView = momentBelowDisplayView(moment);
+        let fillOpacity = filtering ? (active ? 0.18 : 0.035) : 0.09;
+        if (belowView) fillOpacity *= 0.45;
         layer.append("ellipse")
           .attr("cx", cx)
           .attr("cy", cy)
@@ -2786,16 +2803,22 @@
           .attr("filter", "url(#moment-blur)")
           .style("pointer-events", "none");
 
-        const labelY = cy - ry - 5;
+        const labelText = belowView ? `↓ ${moment.label}` : moment.label;
+        let labelY = cy - ry - 5;
+        let labelClass = "moment-label";
+        if (belowView && (labelY > tickBandTop || cy > tickBandTop)) {
+          labelY = tickBandTop;
+          labelClass = "moment-label below-view";
+        }
         if (labelY < 12 || labelY > tickBandTop || cx < 28 || cx > plotWidth - 28) return;
 
         layer.append("text")
-          .attr("class", "moment-label")
+          .attr("class", labelClass)
           .attr("x", cx)
           .attr("y", labelY)
           .attr("text-anchor", "middle")
-          .attr("opacity", filtering && !active ? 0.28 : 1)
-          .text(moment.label);
+          .attr("opacity", filtering && !active ? 0.28 : belowView ? 0.72 : 1)
+          .text(labelText);
       });
     }
 
@@ -2942,7 +2965,7 @@
         .attr("y", PLOT.margin.top + plotHeight / 2)
         .attr("transform", `rotate(-90 ${intensityLabelX} ${PLOT.margin.top + plotHeight / 2})`)
         .attr("text-anchor", "middle")
-        .text("Intensity (est.) →");
+        .text(formatEnergyRangeLabel());
       syncAxisTickLabels(state.zoomTransform);
     }
 
