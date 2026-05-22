@@ -1403,9 +1403,6 @@
     </aside>
 
     <main id="main">
-      <div class="topbar">
-        <div class="pill" id="view-hint">Scroll to zoom in · drag empty space to pan · BPM × intensity grid stays fixed</div>
-      </div>
       <div class="legend" id="legend"></div>
       <div class="moments-legend" id="moments-legend" hidden></div>
       <div class="tooltip" id="tooltip"></div>
@@ -3084,14 +3081,6 @@
       });
     }
 
-    function updateViewHint() {
-      const hint = document.getElementById("view-hint");
-      if (!hint) return;
-      hint.textContent = state.layout === "explore"
-        ? "Mix links: scroll or pinch to zoom · drag empty space to pan · drag nodes to rearrange"
-        : "Mix map: scroll or pinch to zoom · drag to pan · click a node to play";
-    }
-
     function zoomFilter(event) {
       if (event.type === "wheel") return true;
       if (event.type.startsWith("touch")) return true;
@@ -3362,7 +3351,6 @@
         resetView(false);
         state.prevLayout = state.layout;
       }
-      updateViewHint();
     }
 
     function resetView(animate = true) {
