@@ -88,13 +88,71 @@
       border-top-color: var(--panel-border);
     }
 
+    .neighbor-panel.is-visible.is-collapsed {
+      flex: 0 0 auto;
+    }
+
     .neighbor-panel-header {
       flex-shrink: 0;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 6px;
+    }
+
+    .neighbor-panel.is-collapsed .neighbor-panel-header {
+      margin-bottom: 0;
+    }
+
+    .neighbor-panel-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      border: none;
+      background: none;
+      padding: 2px 0;
+      font: inherit;
+      cursor: pointer;
+      color: inherit;
+      text-align: left;
+    }
+
+    .neighbor-panel-toggle:hover .neighbor-panel-title,
+    .neighbor-panel-toggle:hover .neighbor-panel-chevron {
+      color: var(--text);
+      border-color: var(--text);
+    }
+
+    .neighbor-panel-chevron {
+      flex-shrink: 0;
+      width: 7px;
+      height: 7px;
+      margin-top: -0.5px;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      box-sizing: border-box;
+      transform: rotate(45deg);
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .neighbor-panel.is-collapsed .neighbor-panel-chevron {
+      transform: rotate(-45deg);
+      margin-top: -0.5px;
+      margin-left: 1px;
+    }
+
+    .neighbor-panel-body {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .neighbor-panel.is-collapsed .neighbor-panel-body {
+      display: none;
     }
 
     .neighbor-panel-title {
@@ -103,6 +161,7 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--muted);
+      line-height: 1;
     }
 
     .neighbor-panel-count {
@@ -1289,11 +1348,16 @@
 
       <div class="neighbor-panel" id="neighbor-panel" aria-hidden="true">
         <div class="neighbor-panel-header">
-          <span class="neighbor-panel-title">Mix queue</span>
+          <button type="button" class="neighbor-panel-toggle" id="neighbor-panel-toggle" aria-expanded="true" aria-controls="neighbor-panel-body">
+            <span class="neighbor-panel-chevron" aria-hidden="true"></span>
+            <span class="neighbor-panel-title">Mix queue</span>
+          </button>
           <span class="neighbor-panel-count" id="neighbor-panel-count"></span>
         </div>
-        <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
-        <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
+        <div class="neighbor-panel-body" id="neighbor-panel-body">
+          <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
+          <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
+        </div>
       </div>
     </aside>
 
@@ -1389,6 +1453,7 @@
       playIndex: -1,
       highlightNeighbors: false,
       neighborQueueAnchor: null,
+      neighborQueueCollapsed: false,
       layout: "mix",
       showMoments: true,
       activeMoments: new Set(),
@@ -2476,6 +2541,15 @@
       item?.scrollIntoView({ block: "nearest" });
     }
 
+    function syncNeighborPanelCollapse() {
+      const panel = document.getElementById("neighbor-panel");
+      const toggle = document.getElementById("neighbor-panel-toggle");
+      if (!panel || !toggle) return;
+      const collapsed = state.neighborQueueCollapsed && panel.classList.contains("is-visible");
+      panel.classList.toggle("is-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+
     function updateNeighborList(tracks) {
       const panel = document.getElementById("neighbor-panel");
       const list = document.getElementById("neighbor-list");
@@ -2531,6 +2605,7 @@
       }
 
       scrollNeighborItemIntoView(state.playingId || anchorId);
+      syncNeighborPanelCollapse();
     }
 
     function focusOnIds(ids) {
@@ -3352,6 +3427,12 @@
         if (!btn?.dataset.trackId || !state.data) return;
         const track = state.data.tracks.find(t => t.id === btn.dataset.trackId);
         if (track) setNowPlaying(track);
+      });
+
+      document.getElementById("neighbor-panel-toggle").addEventListener("click", () => {
+        if (!state.highlightNeighbors) return;
+        state.neighborQueueCollapsed = !state.neighborQueueCollapsed;
+        syncNeighborPanelCollapse();
       });
 
       updateNeighborsButton(null, 0);
