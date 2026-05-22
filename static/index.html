@@ -195,6 +195,7 @@
     #main {
       position: relative;
       background: var(--bg);
+      overflow: visible;
     }
 
     svg {
@@ -203,6 +204,7 @@
       display: block;
       cursor: grab;
       touch-action: none;
+      overflow: visible;
     }
 
     svg.is-panning {
@@ -496,7 +498,8 @@
     };
 
     const PLOT = {
-      margin: { top: 36, right: 36, bottom: 52, left: 52 },
+      margin: { top: 44, right: 36, bottom: 52, left: 52 },
+      inset: { left: 52, right: 36, top: 52, bottom: 40 },
       bpmDomain: [70, 180],
       energyDomain: [0, 1]
     };
@@ -560,16 +563,34 @@
     function bpmScale(plotWidth) {
       return d3.scaleLinear()
         .domain(PLOT.bpmDomain)
-        .range([0, plotWidth]);
+        .range([PLOT.inset.left, plotWidth - PLOT.inset.right]);
     }
 
     function energyScale(plotHeight) {
       return d3.scaleLinear()
         .domain(PLOT.energyDomain)
-        .range([plotHeight, 0]);
+        .range([plotHeight - PLOT.inset.bottom, PLOT.inset.top]);
     }
 
-    function stableJitter(id, ampX = 34, ampY = 22) {
+    function softBound(value, min, max, id, spread = 14) {
+      if (value >= min && value <= max) return value;
+      const [j] = stableJitter(id, spread, 0);
+      if (value < min) return min + Math.abs(j) * 0.65;
+      return max - Math.abs(j) * 0.65;
+    }
+
+    function boundToPlot(x, y, plotWidth, plotHeight, id, pad = 6) {
+      const minX = pad;
+      const maxX = plotWidth - pad;
+      const minY = pad;
+      const maxY = plotHeight - pad;
+      return {
+        x: softBound(x, minX, maxX, `${id}:x`),
+        y: softBound(y, minY, maxY, `${id}:y`)
+      };
+    }
+
+    function stableJitter(id, ampX = 28, ampY = 18) {
       let h = 2166136261;
       for (let i = 0; i < id.length; i++) {
         h ^= id.charCodeAt(i);
@@ -577,17 +598,28 @@
       }
       const angle = ((h & 0xffff) / 0xffff) * Math.PI * 2;
       const radius = (((h >>> 16) & 0xffff) / 0xffff);
-      return [Math.cos(angle) * radius * ampX, Math.sin(angle) * radius * ampY];
+      const jx = Math.cos(angle) * radius * ampX;
+      const jy = Math.sin(angle) * radius * ampY;
+      // Bias jitter downward slightly so high-energy nodes don't clip the top edge.
+      return [jx, jy >= 0 ? jy * 0.55 : jy];
     }
 
-    function trackPosition(track, x, y, jitter = true) {
+    function trackPosition(track, x, y, jitter = true, plotWidth = null, plotHeight = null) {
       const cx = track.bpm != null
         ? x(track.bpm)
         : x(PLOT.bpmDomain[0] + (PLOT.bpmDomain[1] - PLOT.bpmDomain[0]) / 2);
       const cy = y(track.energy ?? 0.5);
-      if (!jitter) return { x: cx, y: cy };
-      const [jx, jy] = stableJitter(track.id);
-      return { x: cx + jx, y: cy + jy };
+      let px = cx;
+      let py = cy;
+      if (jitter) {
+        const [jx, jy] = stableJitter(track.id);
+        px = cx + jx;
+        py = cy + jy;
+      }
+      if (plotWidth != null && plotHeight != null) {
+        return boundToPlot(px, py, plotWidth, plotHeight, track.id);
+      }
+      return { x: px, y: py };
     }
 
     function momentEllipse(moment, x, y) {
@@ -991,8 +1023,8 @@
       const hint = document.getElementById("view-hint");
       if (!hint) return;
       hint.textContent = state.layout === "explore"
-        ? "Explore: scroll to zoom · Alt+drag to pan · drag nodes to rearrange"
-        : "Mix map: scroll to zoom · Alt+drag to pan · click a node to play";
+        ? "Explore: scroll or pinch to zoom · Option+drag to pan · drag nodes to rearrange"
+        : "Mix map: scroll or pinch to zoom · Option+drag to pan · click a node to play";
     }
 
     function zoomFilter(event) {
@@ -1087,7 +1119,7 @@
           t.x = plotWidth / 2 + (Math.random() - 0.5) * plotWidth * 0.15;
           t.y = plotHeight / 2 + (Math.random() - 0.5) * plotHeight * 0.15;
         } else {
-          const pos = trackPosition(t, x, y);
+          const pos = trackPosition(t, x, y, true, plotWidth, plotHeight);
           t.x = pos.x;
           t.y = pos.y;
         }
@@ -1103,8 +1135,8 @@
 
       if (state.layout === "mix") {
         simulation
-          .force("x", d3.forceX(d => trackPosition(d, x, y, true).x).strength(0.1))
-          .force("y", d3.forceY(d => trackPosition(d, x, y, true).y).strength(0.2));
+          .force("x", d3.forceX(d => trackPosition(d, x, y, true, plotWidth, plotHeight).x).strength(0.1))
+          .force("y", d3.forceY(d => trackPosition(d, x, y, true, plotWidth, plotHeight).y).strength(0.2));
       } else {
         simulation
           .force("x", d3.forceX(plotWidth / 2).strength(0.03))
