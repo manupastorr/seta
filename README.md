@@ -2,7 +2,7 @@
 
 Local web app to browse a DJ library on a **BPM × energy** map, with **Camelot** mix links, playback, and set-moment overlays.
 
-Scans:
+Default scan folders (override with `.env`):
 
 - `~/Music/tracks` — approved library
 - `~/Downloads/To Curate` — intake / uncured batches
@@ -10,30 +10,82 @@ Scans:
 ## Quick start
 
 ```bash
+git clone https://github.com/manupastorr/track-graph.git
+cd track-graph
 ./start.sh
 ```
 
 Opens **http://127.0.0.1:8765** after scanning (cached analysis is reused when files unchanged).
 
-Venv lives at `tools/.venv` (shared with this app).
+First run creates a local `.venv` in the project folder.
+
+## Share with someone else (separate Mac, own tracks)
+
+Each person runs their **own copy** with **their own music folders**. The app does not sync libraries over the network.
+
+### 1. GitHub access
+
+Repo owner: **Settings → Collaborators → Add people** on [github.com/manupastorr/track-graph](https://github.com/manupastorr/track-graph).
+
+### 2. Clone and install
+
+```bash
+git clone https://github.com/manupastorr/track-graph.git
+cd track-graph
+cp .env.example .env   # optional — only if paths differ from defaults
+./start.sh
+```
+
+### 3. Music folders
+
+Use the same layout on her Mac (or set paths in `.env`):
+
+```
+~/Music/tracks/
+  House & Deep House/
+  Melodic House & Techno/
+  …
+
+~/Downloads/To Curate/
+  some playlist batch/
+```
+
+Supported audio: `.wav`, `.aiff`, `.aif`, `.flac`, `.mp3`
+
+### 4. Custom paths (`.env`)
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```bash
+TRACK_GRAPH_TRACKS_ROOT=~/Music/tracks
+TRACK_GRAPH_CURATE_ROOT=~/Downloads/To Curate
+TRACK_GRAPH_PORT=8765
+```
+
+Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.json` (not in git).
 
 ## Manual commands
 
 ```bash
 # Scan only
-../.venv/bin/python scan_library.py
+.venv/bin/python scan_library.py
 
 # Scan with options
-../.venv/bin/python scan_library.py --workers 4 --skip-edges
+.venv/bin/python scan_library.py --workers 4 --skip-edges
 
 # Server only (requires library.json)
-../.venv/bin/python server.py
+.venv/bin/python server.py
 ```
 
 ## What it does
 
 | Piece | Role |
 |-------|------|
+| `config.py` | Paths and port from env / `.env` |
 | `scan_library.py` | Walks audio folders, analyzes tracks, writes `library.json` + mix edges |
 | `analyze.py` | BPM, Camelot key, energy (librosa, ~90s sample) |
 | `camelot.py` | Wheel colors + mix compatibility scoring |
@@ -50,6 +102,7 @@ Venv lives at `tools/.venv` (shared with this app).
 - `library.json` — scan output for the UI
 - `cache.json` — per-file analysis cache
 - `scan.log`
+- `.env` — local path overrides
 
 Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze.py`).
 
@@ -59,15 +112,11 @@ Not indexed as library tracks:
 
 - `samples/sample_*.wav` under `To Curate` — short clips from **soundcloud-set-id** set identification (Shazam probes). Keep `tracklist.md` / `tracklist.json`; delete `samples/` when done.
 
-## Library organization
+## Library organization (Manuel’s setup)
 
-Genre folders, sorting rules, and curation workflow live in the parent repo:
-
-**[`~/Music/tracks/AGENTS.md`](../../AGENTS.md)**
-
-This tool reads those folders; it does not move or classify files.
+Genre folders, sorting rules, and curation workflow for the main library live in a separate notes file at `~/Music/tracks/AGENTS.md`. This tool only **reads** audio folders; it does not move or classify files.
 
 ## Requirements
 
 - Python 3.10+
-- See `requirements.txt` — install via `start.sh` or `pip install -r requirements.txt`
+- See `requirements.txt` — installed automatically by `start.sh`

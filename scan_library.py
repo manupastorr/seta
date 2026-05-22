@@ -13,10 +13,11 @@ from pathlib import Path
 
 from analyze import ANALYSIS_VERSION, analyze_track
 from camelot import mix_score
+from config import curate_root, tracks_root
 
 GRAPH_DIR = Path(__file__).resolve().parent
-TRACKS_ROOT = Path.home() / "Music" / "tracks"
-CURATE_ROOT = Path.home() / "Downloads" / "To Curate"
+TRACKS_ROOT = tracks_root()
+CURATE_ROOT = curate_root()
 CACHE_PATH = GRAPH_DIR / "cache.json"
 LIBRARY_PATH = GRAPH_DIR / "library.json"
 AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}

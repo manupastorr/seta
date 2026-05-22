@@ -10,19 +10,29 @@ For moving/sorting/classifying audio files, follow the parent library rules:
 
 ## Paths
 
+Defaults (override with `.env` or env vars):
+
+| Variable | Default |
+|----------|---------|
+| `TRACK_GRAPH_TRACKS_ROOT` | `~/Music/tracks` |
+| `TRACK_GRAPH_CURATE_ROOT` | `~/Downloads/To Curate` |
+| `TRACK_GRAPH_PORT` | `8765` |
+
+Copy `.env.example` → `.env` per machine. Do not commit `.env`.
+
 | Path | Purpose |
 |------|---------|
 | `~/Music/tracks` | Approved library (`source: tracks`) |
 | `~/Downloads/To Curate` | Intake (`source: to_curate`) |
-| `tools/.venv` | Shared Python venv |
+| `.venv/` | Local Python venv (created by `start.sh`) |
 | `library.json` / `cache.json` | Generated locally — do not commit |
 
 ## Run / develop
 
 ```bash
 ./start.sh                    # scan + serve on :8765
-../.venv/bin/python scan_library.py
-../.venv/bin/python server.py
+.venv/bin/python scan_library.py
+.venv/bin/python server.py
 ```
 
 After changing `analyze.py`, bump `ANALYSIS_VERSION` so the cache re-analyzes stale entries.

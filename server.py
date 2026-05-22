@@ -9,12 +9,11 @@ from pathlib import Path
 
 from flask import Flask, Response, abort, jsonify, send_from_directory
 
+from config import allowed_roots, port, tracks_root
+
 GRAPH_DIR = Path(__file__).resolve().parent
 STATIC_DIR = GRAPH_DIR / "static"
 LIBRARY_PATH = GRAPH_DIR / "library.json"
-TRACKS_ROOT = Path.home() / "Music" / "tracks"
-CURATE_ROOT = Path.home() / "Downloads" / "To Curate"
-ALLOWED_ROOTS = (TRACKS_ROOT.resolve(), CURATE_ROOT.resolve())
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 TRACK_INDEX: dict[str, dict] = {}
@@ -32,7 +31,7 @@ def load_library() -> dict:
 
 def allowed_path(path: Path) -> bool:
     resolved = path.resolve()
-    return any(resolved == root or resolved.is_relative_to(root) for root in ALLOWED_ROOTS)
+    return any(resolved == root or resolved.is_relative_to(root) for root in allowed_roots())
 
 
 @app.get("/")
@@ -61,9 +60,11 @@ def api_audio(track_id: str) -> Response:
 
 def main() -> None:
     load_library()
-    print("Track graph: http://127.0.0.1:8765")
+    listen_port = port()
+    print(f"Track graph: http://127.0.0.1:{listen_port}")
     print(f"Library: {LIBRARY_PATH}")
-    app.run(host="127.0.0.1", port=8765, debug=False, threaded=True)
+    print(f"Tracks root: {tracks_root()}")
+    app.run(host="127.0.0.1", port=listen_port, debug=False, threaded=True)
 
 
 if __name__ == "__main__":
