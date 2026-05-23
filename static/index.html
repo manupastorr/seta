@@ -336,7 +336,8 @@
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
-      width: 268px;
+      width: max-content;
+      max-width: none;
       padding: 5px 8px;
       border-radius: 10px;
       box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
@@ -358,6 +359,7 @@
       visibility: visible;
       pointer-events: auto;
       width: 268px;
+      max-width: 268px;
       padding-bottom: 10px;
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
     }
@@ -1641,9 +1643,21 @@
     }
 
     .moments-legend-grid {
-      display: grid;
-      grid-template-columns: 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 0;
+    }
+
+    .moment-legend-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .moment-legend-section + .moment-legend-section {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(226, 226, 234, 0.85);
     }
 
     .moment-legend-section-title {
@@ -1652,11 +1666,7 @@
       letter-spacing: 0.05em;
       text-transform: uppercase;
       color: var(--muted);
-      padding: 4px 4px 1px;
-    }
-
-    .moment-legend-section-title:first-child {
-      padding-top: 2px;
+      padding: 0 4px 4px;
     }
 
     .moment-legend-item {
@@ -1669,7 +1679,7 @@
       line-height: 1.15;
       color: var(--text);
       width: 100%;
-      padding: 1px 4px;
+      padding: 2px 4px;
       min-height: 0;
       border: 1px solid transparent;
       border-radius: 6px;
@@ -1817,9 +1827,8 @@
     }
 
     .mix-dock-tabs {
-      display: flex;
+      display: inline-flex;
       gap: 6px;
-      flex: 1;
       align-items: center;
       flex-shrink: 0;
     }
@@ -2966,9 +2975,15 @@
       return hovered ? base + LOUPE.hoverRadiusBoost : base;
     }
 
-    function mixDockWidth() {
+    function mixDockObscureWidth() {
       const panel = document.getElementById("mix-dock");
       if (!panel?.classList.contains("is-chrome")) return 0;
+      return Math.ceil(panel.getBoundingClientRect().width) + 10;
+    }
+
+    function mixDockLayoutWidth() {
+      const panel = document.getElementById("mix-dock");
+      if (!panel?.classList.contains("is-chrome") || !panel.classList.contains("is-visible")) return 0;
       return Math.ceil(panel.getBoundingClientRect().width) + 10;
     }
 
@@ -2992,7 +3007,7 @@
       if (bar) {
         document.getElementById("app").style.setProperty("--filter-bar-height", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
       }
-      const mixWidth = mixDockWidth();
+      const mixWidth = mixDockLayoutWidth();
       const uiLeft = mixWidth + 18;
       document.getElementById("app").style.setProperty("--mix-dock-width", `${mixWidth}px`);
       document.getElementById("app").style.setProperty("--ui-left", `${uiLeft}px`);
@@ -3016,7 +3031,7 @@
     function isNodeObscured(node) {
       const screen = trackScreenPoint(node);
       if (!screen) return false;
-      if (screen.x < mixDockWidth() + 8) return true;
+      if (screen.x < mixDockObscureWidth() + 8) return true;
       if (screen.y < filterBarHeight() + 8) return true;
       return screen.y > window.innerHeight - playerDockHeight() - 10;
     }
@@ -3092,7 +3107,7 @@
     function tryPlayTrackAt(event) {
       if (state.pointerDragged || !state.viewport) return;
       clearQueueFocusHighlight();
-      if (event.clientX < mixDockWidth() + 8) return;
+      if (event.clientX < mixDockObscureWidth() + 8) return;
       const [px, py] = d3.pointer(event, state.viewport.node());
       const { plotWidth, plotHeight } = plotSize();
       if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
@@ -3182,7 +3197,7 @@
       const width = document.getElementById("app").clientWidth;
       const height = Math.max(200, window.innerHeight);
       const bottomChrome = playerDockHeight() + 10;
-      const plotLeft = mixDockWidth() + PLOT.margin.left;
+      const plotLeft = mixDockLayoutWidth() + PLOT.margin.left;
       const plotWidth = Math.max(120, width - plotLeft - PLOT.margin.right);
       const plotHeight = Math.max(120, height - PLOT.margin.top - PLOT.margin.bottom - bottomChrome);
       return {
@@ -3405,10 +3420,12 @@
       const grid = legend.querySelector(".moments-legend-grid");
       const momentById = new Map(SET_MOMENTS.map(m => [m.id, m]));
       SET_MOMENT_SECTIONS.forEach(section => {
+        const block = document.createElement("div");
+        block.className = "moment-legend-section";
         const heading = document.createElement("div");
         heading.className = "moment-legend-section-title";
         heading.textContent = section.label;
-        grid.appendChild(heading);
+        block.appendChild(heading);
         section.ids.forEach(id => {
           const moment = momentById.get(id);
           if (!moment) return;
@@ -3426,8 +3443,9 @@
           label.className = `moment-legend-label${momentBelowDisplayView(moment) ? " below-view" : ""}`;
           label.textContent = moment.label;
           row.append(cloud, label);
-          grid.appendChild(row);
+          block.appendChild(row);
         });
+        grid.appendChild(block);
       });
       syncMomentsLegendCollapse();
     }
@@ -3795,6 +3813,7 @@
         neighborsTab.title = state.selectedId ? "Toggle neighbors (n)" : "";
       }
       if (neighborsSep) neighborsSep.hidden = !state.selectedId;
+      syncUiLayout();
     }
 
     function updateDraftSortChips() {
