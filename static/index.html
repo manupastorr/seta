@@ -2289,9 +2289,9 @@
       <div class="mix-dock" id="mix-dock" aria-hidden="true">
         <div class="mix-dock-header">
           <div class="mix-dock-tabs">
-            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors" title="Toggle neighbors (n)"><kbd>n</kbd> neighbors<span class="mix-dock-tab-count" id="neighbors-tab-count"></span></button>
+            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors" title="Neighbors panel (s)"><kbd>m</kbd> neighbors<span class="mix-dock-tab-count" id="neighbors-tab-count"></span></button>
             <span class="mix-dock-tab-sep" aria-hidden="true">·</span>
-            <button type="button" class="mix-dock-tab" id="mix-tab-draft" data-tab="draft" title="Toggle draft (d)"><kbd>d</kbd> draft<span class="mix-dock-tab-count" id="draft-tab-count"></span></button>
+            <button type="button" class="mix-dock-tab" id="mix-tab-draft" data-tab="draft" title="Draft panel (s)"><kbd>d</kbd> draft<span class="mix-dock-tab-count" id="draft-tab-count"></span></button>
           </div>
         </div>
         <div class="mix-dock-body" id="mix-dock-body">
@@ -2417,11 +2417,12 @@
         ],
       },
       {
-        title: "Mix queue",
+        title: "Mix dock",
         rows: [
-          { keys: "m", desc: "Open neighbors tab" },
-          { keys: "n", desc: "Toggle neighbors on map" },
-          { keys: "↑ ↓", desc: "Move in queue (neighbors or draft tab)" },
+          { keys: "s", desc: "Toggle sidebar (current tab)" },
+          { keys: "m", desc: "Switch to neighbors tab" },
+          { keys: "n", desc: "Toggle neighbor mode on map" },
+          { keys: "↑ ↓", desc: "Move in queue when sidebar is open" },
           { keys: "Enter", desc: "Play highlighted queue track" },
         ],
       },
@@ -2430,7 +2431,7 @@
         rows: [
           { keys: "a", desc: "Add selected track to draft" },
           { keys: "Backspace", desc: "Remove selected track from draft" },
-          { keys: "d", desc: "Toggle draft panel" },
+          { keys: "d", desc: "Switch to draft tab" },
           { keys: "f", desc: "Toggle final mark on selected draft track" },
           { keys: "p", desc: "Play draft from start" },
           { keys: "e", desc: "Sort draft by energy" },
@@ -2443,7 +2444,7 @@
           { keys: "z", desc: "Toggle set zones panel" },
           { keys: "k", desc: "Toggle Camelot keys panel" },
           { keys: "r", desc: "Reset map view" },
-          { keys: "Esc", desc: "Clear filters → neighbors → reset view" },
+          { keys: "Esc", desc: "Clear filters → sidebar → neighbor mode → reset view" },
         ],
       },
       {
@@ -2540,6 +2541,7 @@
       energyDisplayDomain: null,
       draftStore: { activeId: null, drafts: {} },
       mixDockTab: "neighbors",
+      mixDockNeighborsOpen: false,
       mixDockDraftOpen: false,
       draftOnlyFilter: false,
       draftPlayThrough: false,
@@ -3705,6 +3707,9 @@
       }
       if (addTrackToActiveDraft(state.selectedId)) {
         setMixDockTab("draft");
+        state.mixDockDraftOpen = true;
+        updateMixDockChrome();
+        updateDraftUi();
       }
     }
 
@@ -3734,8 +3739,16 @@
       renderGraph();
     }
 
+    function isNeighborsPanelOpen() {
+      return state.mixDockTab === "neighbors" && state.mixDockNeighborsOpen && !!state.selectedId;
+    }
+
     function isDraftPanelOpen() {
       return state.mixDockTab === "draft" && state.mixDockDraftOpen;
+    }
+
+    function isMixDockSidebarOpen() {
+      return state.mixDockTab === "draft" ? state.mixDockDraftOpen : state.mixDockNeighborsOpen;
     }
 
     function closeDraftPanel() {
@@ -3747,31 +3760,56 @@
       renderGraph();
     }
 
-    function openDraftPanel() {
-      state.mixDockDraftOpen = true;
-      setMixDockTab("draft");
+    function closeNeighborsPanel() {
+      state.mixDockNeighborsOpen = false;
+      syncPlayQueue();
+      updateMixDockChrome();
+      updateNeighborList(filteredTracks());
+      renderGraph();
     }
 
-    function toggleDraftPanel() {
-      if (isDraftPanelOpen()) closeDraftPanel();
-      else openDraftPanel();
+    function toggleNeighborsSidebar() {
+      if (!state.selectedId) {
+        setPlayerIdle("Select a track on the graph first");
+        return;
+      }
+      if (state.mixDockTab !== "neighbors") {
+        setMixDockTab("neighbors");
+        state.mixDockNeighborsOpen = true;
+      } else {
+        state.mixDockNeighborsOpen = !state.mixDockNeighborsOpen;
+      }
+      syncPlayQueue();
+      updateMixDockChrome();
+      updateNeighborList(filteredTracks());
+      updateDraftUi();
+      renderGraph();
+    }
+
+    function toggleDraftSidebar() {
+      if (state.mixDockTab !== "draft") {
+        setMixDockTab("draft");
+        state.mixDockDraftOpen = true;
+      } else {
+        state.mixDockDraftOpen = !state.mixDockDraftOpen;
+        if (!state.mixDockDraftOpen) state.draftPlayThrough = false;
+      }
+      syncPlayQueue();
+      updateMixDockChrome();
+      updateDraftUi();
+      renderGraph();
+    }
+
+    function toggleMixDockSidebar() {
+      if (state.mixDockTab === "draft") toggleDraftSidebar();
+      else toggleNeighborsSidebar();
     }
 
     function setMixDockTab(tab) {
       if (tab !== "neighbors" && tab !== "draft") return;
       state.mixDockTab = tab;
-      if (tab === "draft") state.mixDockDraftOpen = true;
-
-      if (tab === "neighbors") {
-        state.draftPlayThrough = false;
-        if (state.selectedId) {
-          state.highlightNeighbors = true;
-          state.neighborQueueAnchor = state.selectedId;
-        } else {
-          state.highlightNeighbors = false;
-          state.neighborQueueAnchor = null;
-        }
-      }
+      if (tab === "draft") state.draftPlayThrough = false;
+      if (tab === "neighbors") state.draftPlayThrough = false;
 
       document.getElementById("mix-tab-neighbors")?.classList.toggle("active", tab === "neighbors");
       document.getElementById("mix-tab-draft")?.classList.toggle("active", tab === "draft");
@@ -3792,14 +3830,13 @@
       if (!panel) return;
       const draft = activeDraft();
       const draftCount = draft?.trackIds.length || 0;
-      const onDraftTab = state.mixDockTab === "draft";
-      const onNeighborsTab = state.mixDockTab === "neighbors";
-      const draftActive = onDraftTab && state.mixDockDraftOpen;
-      const neighborsActive = onNeighborsTab
-        && state.highlightNeighbors
-        && !!state.selectedId;
+      const draftActive = isDraftPanelOpen();
+      const neighborsActive = isNeighborsPanelOpen();
       const hasContext = !!state.selectedId || draftCount > 0;
-      const showChrome = draftActive || neighborsActive || hasContext;
+      const showChrome = hasContext
+        || state.highlightNeighbors
+        || state.mixDockNeighborsOpen
+        || state.mixDockDraftOpen;
       const showList = draftActive || neighborsActive;
       panel.classList.toggle("is-chrome", showChrome);
       panel.classList.toggle("is-visible", showList);
@@ -3810,7 +3847,7 @@
       if (neighborsTab) {
         neighborsTab.disabled = !state.selectedId;
         neighborsTab.hidden = !state.selectedId;
-        neighborsTab.title = state.selectedId ? "Toggle neighbors (n)" : "";
+        neighborsTab.title = state.selectedId ? "Neighbors panel (s)" : "";
       }
       if (neighborsSep) neighborsSep.hidden = !state.selectedId;
       syncUiLayout();
@@ -3964,6 +4001,7 @@
       const draft = activeDraft();
       if (!draft?.trackIds.length) return;
       state.draftPlayThrough = true;
+      state.mixDockDraftOpen = true;
       setMixDockTab("draft");
       syncPlayQueue();
       if (!state.playQueue.length) return;
@@ -4393,8 +4431,7 @@
       if (!panel || !list || !emptyEl) return;
 
       const anchorId = neighborAnchorId();
-      const neighborsListReady = state.mixDockTab === "neighbors"
-        && state.highlightNeighbors && !!anchorId;
+      const neighborsListReady = isNeighborsPanelOpen() && !!anchorId;
 
       if (!neighborsListReady) {
         list.innerHTML = "";
@@ -4403,8 +4440,8 @@
           emptyEl.hidden = false;
           emptyEl.textContent = !state.selectedId
             ? "Select a track on the map to see mix neighbors."
-            : !state.highlightNeighbors
-              ? "Press n to highlight mix neighbors on the map."
+            : !state.mixDockNeighborsOpen
+              ? "Press s or click neighbors to open the mix queue."
               : "Select a track on the map.";
         }
         state.queueFocusIndex = -1;
@@ -4844,10 +4881,6 @@
     }
 
     function setNowPlaying(track, autoplay = true) {
-      if (state.mixDockTab === "neighbors" && !state.highlightNeighbors) {
-        state.highlightNeighbors = true;
-        state.neighborQueueAnchor = track.id;
-      }
       if (state.highlightNeighbors) {
         const prevAnchor = state.neighborQueueAnchor;
         const anchorId = neighborAnchorId();
@@ -4899,9 +4932,9 @@
       const panel = document.getElementById("mix-dock");
       if (!panel?.classList.contains("is-visible")) return false;
       if (state.mixDockTab === "draft") {
-        return (activeDraft()?.trackIds.length || 0) > 0;
+        return isDraftPanelOpen() && (activeDraft()?.trackIds.length || 0) > 0;
       }
-      return state.highlightNeighbors && !!neighborAnchorId();
+      return isNeighborsPanelOpen() && !!neighborAnchorId();
     }
 
     function activeQueueItems() {
@@ -4991,12 +5024,13 @@
     }
 
     function enableNeighborsMode() {
+      if (!state.selectedId) return;
       state.highlightNeighbors = true;
       state.draftPlayThrough = false;
       state.neighborQueueAnchor = state.selectedId;
-      setMixDockTab("neighbors");
       syncPlayQueue();
       focusNeighborGroup(state.selectedId);
+      updateMixDockChrome();
       renderGraph();
     }
 
@@ -5010,6 +5044,7 @@
       state.neighborQueueAnchor = null;
       state.queueFocusIndex = -1;
       syncPlayQueue();
+      updateMixDockChrome();
       setTimeout(() => restoreMapView(true), 300);
       renderGraph();
     }
@@ -5072,6 +5107,11 @@
       }
       if (viewFiltersActive()) {
         clearViewFilters();
+        return true;
+      }
+      if (isMixDockSidebarOpen()) {
+        if (state.mixDockTab === "draft") closeDraftPanel();
+        else closeNeighborsPanel();
         return true;
       }
       if (state.highlightNeighbors) {
@@ -5138,9 +5178,15 @@
         return;
       }
 
+      if ((event.key === "s" || event.key === "S") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        toggleMixDockSidebar();
+        return;
+      }
+
       if ((event.key === "d" || event.key === "D") && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
-        toggleDraftPanel();
+        setMixDockTab("draft");
         return;
       }
 
@@ -5947,11 +5993,8 @@
       audio.addEventListener("pause", updatePlayButton);
       audio.addEventListener("ended", () => playRelative(1));
 
-      document.getElementById("mix-tab-neighbors").addEventListener("click", () => setMixDockTab("neighbors"));
-      document.getElementById("mix-tab-draft").addEventListener("click", () => {
-        if (isDraftPanelOpen()) toggleDraftPanel();
-        else openDraftPanel();
-      });
+      document.getElementById("mix-tab-neighbors").addEventListener("click", () => toggleNeighborsSidebar());
+      document.getElementById("mix-tab-draft").addEventListener("click", () => toggleDraftSidebar());
 
       document.getElementById("neighbor-list").addEventListener("click", (event) => {
         const btn = event.target.closest(".neighbor-item");
