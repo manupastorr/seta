@@ -2021,6 +2021,11 @@
       line-height: 14px;
     }
 
+    .draft-item .draft-track-meta {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
     .draft-drag-handle {
       cursor: grab;
       color: var(--muted);
@@ -3710,9 +3715,17 @@
       return `<span class="neighbor-meta" title="Intensity"><span class="tt-badge energy neighbor-badge">${energyVal}</span></span>`;
     }
 
+    function draftArtistLineHtml(track) {
+      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
+      const bpm = track.bpm != null ? Math.round(track.bpm) : null;
+      const key = track.key ? SetaRenderSafe.html(track.key) : null;
+      const meta = [bpm != null ? String(bpm) : null, key].filter(Boolean).join(" · ");
+      if (!meta) return `<span class="neighbor-artist">${artist}</span>`;
+      return `<span class="neighbor-artist">${artist}<span class="draft-track-meta"> · ${meta}</span></span>`;
+    }
+
     function draftListItemHtml(track, index, { playing = false, isFinal = false, note = "" } = {}) {
       const title = SetaRenderSafe.html(track.title || "Unknown title");
-      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
       const trackId = SetaRenderSafe.attr(track.id);
       const classes = [
         "draft-item",
@@ -3727,7 +3740,7 @@
           <button type="button" class="neighbor-item draft-row" data-track-id="${trackId}" role="option">
             <span class="neighbor-main">
               <span class="neighbor-title">${title}</span>
-              <span class="neighbor-artist">${artist}</span>
+              ${draftArtistLineHtml(track)}
             </span>
             ${draftTrackMetaHtml(track)}
           </button>
