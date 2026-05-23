@@ -47,6 +47,34 @@ test("energyRampPoints returns svg path", () => {
   assert.equal(points.length, 2);
 });
 
+test("reorderDraftByDisplayIndex switches to manual order", () => {
+  const draft = Draft.createDraft("Reorder");
+  draft.trackIds = ["a", "b", "c"];
+  draft.sortMode = "manual";
+  const byId = new Map([
+    ["a", track("a", "A", 0.9, 120)],
+    ["b", track("b", "B", 0.5, 118)],
+    ["c", track("c", "C", 0.2, 110)],
+  ]);
+  Draft.reorderDraftByDisplayIndex(draft, 0, 2, byId, "manual");
+  assert.equal(draft.sortMode, "manual");
+  assert.deepEqual(draft.trackIds, ["b", "c", "a"]);
+});
+
+test("reorderDraftByDisplayIndex uses current display order when sorted", () => {
+  const draft = Draft.createDraft("Reorder");
+  draft.trackIds = ["a", "b", "c"];
+  draft.sortMode = "energy";
+  const byId = new Map([
+    ["a", track("a", "A", 0.9, 120)],
+    ["b", track("b", "B", 0.5, 118)],
+    ["c", track("c", "C", 0.2, 110)],
+  ]);
+  Draft.reorderDraftByDisplayIndex(draft, 0, 2, byId, "energy");
+  assert.equal(draft.sortMode, "manual");
+  assert.deepEqual(draft.trackIds, ["b", "a", "c"]);
+});
+
 test("load and save draft store roundtrip", () => {
   const storage = new Map();
   const shim = {

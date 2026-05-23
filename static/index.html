@@ -1964,10 +1964,18 @@
       margin-bottom: 4px;
     }
 
+    .draft-list > li.is-dragging {
+      opacity: 0.45;
+    }
+
+    .draft-list > li.is-drag-over .draft-item {
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+
     .draft-item {
       width: 100%;
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto auto 1fr auto;
       gap: 6px;
       align-items: start;
       border: 1px solid transparent;
@@ -2030,6 +2038,32 @@
 
     .draft-item .draft-row .neighbor-title {
       line-height: 14px;
+    }
+
+    .draft-drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1;
+      padding: 0 1px;
+      align-self: start;
+      margin-top: 1px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      touch-action: none;
+      opacity: 0.55;
+    }
+
+    .draft-item:hover .draft-drag-handle,
+    .draft-drag-handle:focus-visible {
+      opacity: 1;
+    }
+
+    .draft-drag-handle:active {
+      cursor: grabbing;
     }
 
     .draft-star {
@@ -3706,8 +3740,9 @@
         state.selectedId === track.id ? "is-active" : "",
         isFinal ? "is-final" : "",
       ].filter(Boolean).join(" ");
-      return `<li>
-        <div class="${classes}" data-track-id="${trackId}" data-draft-index="${index}">
+      return `<li data-track-id="${trackId}" data-draft-index="${index}">
+        <div class="${classes}">
+          <span class="draft-drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span>
           <button type="button" class="draft-star" data-draft-star="${trackId}" title="Mark final cut" aria-label="Toggle final cut">${isFinal ? "★" : "☆"}</button>
           <button type="button" class="neighbor-item draft-row" data-track-id="${trackId}" role="option">
             <span class="neighbor-main">
@@ -3795,6 +3830,76 @@
       syncPlayQueue();
       if (!state.playQueue.length) return;
       playTrackAt(0, true);
+    }
+
+    let draftDragFromIndex = null;
+
+    function cleanupDraftDrag(list) {
+      draftDragFromIndex = null;
+      list.querySelectorAll("li.is-dragging, li.is-drag-over").forEach(el => {
+        el.classList.remove("is-dragging", "is-drag-over");
+      });
+    }
+
+    function bindDraftListDragDrop() {
+      const list = document.getElementById("draft-list");
+      if (!list) return;
+
+      list.addEventListener("dragstart", (event) => {
+        const handle = event.target.closest(".draft-drag-handle");
+        if (!handle) {
+          event.preventDefault();
+          return;
+        }
+        const li = handle.closest("li");
+        if (!li) return;
+        draftDragFromIndex = Number(li.dataset.draftIndex);
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", li.dataset.trackId || "");
+        li.classList.add("is-dragging");
+      });
+
+      list.addEventListener("dragover", (event) => {
+        if (draftDragFromIndex == null) return;
+        const li = event.target.closest("#draft-list > li");
+        if (!li) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        list.querySelectorAll("li.is-drag-over").forEach(el => el.classList.remove("is-drag-over"));
+        li.classList.add("is-drag-over");
+      });
+
+      list.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const li = event.target.closest("#draft-list > li");
+        if (!li || draftDragFromIndex == null) return;
+        const toIndex = Number(li.dataset.draftIndex);
+        const draft = activeDraft();
+        if (!draft || Number.isNaN(toIndex) || toIndex === draftDragFromIndex) {
+          cleanupDraftDrag(list);
+          return;
+        }
+        TD.reorderDraftByDisplayIndex(
+          draft,
+          draftDragFromIndex,
+          toIndex,
+          tracksByIdMap(),
+          draft.sortMode
+        );
+        persistDraftState();
+        syncPlayQueue();
+        updateDraftUi();
+        renderGraph();
+        cleanupDraftDrag(list);
+      });
+
+      list.addEventListener("dragend", () => cleanupDraftDrag(list));
+
+      list.addEventListener("dragleave", (event) => {
+        if (!list.contains(event.relatedTarget)) {
+          list.querySelectorAll("li.is-drag-over").forEach(el => el.classList.remove("is-drag-over"));
+        }
+      });
     }
 
     function syncPlayQueue() {
@@ -5676,6 +5781,8 @@
         const track = state.data.tracks.find(t => t.id === btn.dataset.trackId);
         if (track) setNowPlaying(track);
       });
+
+      bindDraftListDragDrop();
 
       document.getElementById("draft-list").addEventListener("click", (event) => {
         const removeBtn = event.target.closest("[data-draft-remove]");

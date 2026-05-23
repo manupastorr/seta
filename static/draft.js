@@ -176,6 +176,21 @@
     return touchDraft(draft);
   }
 
+  function reorderDraftByDisplayIndex(draft, fromIndex, toIndex, tracksById, sortMode = draft?.sortMode) {
+    if (!draft || fromIndex === toIndex) return draft;
+    const tracks = resolveDraftTracks(draft, tracksById, sortMode);
+    if (
+      fromIndex < 0 || toIndex < 0
+      || fromIndex >= tracks.length || toIndex >= tracks.length
+    ) return draft;
+    const ids = tracks.map(t => t.id);
+    const [moved] = ids.splice(fromIndex, 1);
+    ids.splice(toIndex, 0, moved);
+    draft.trackIds = ids;
+    draft.sortMode = "manual";
+    return touchDraft(draft);
+  }
+
   function exportDraftM3u(draft, tracksById, sortMode = draft?.sortMode) {
     const tracks = resolveDraftTracks(draft, tracksById, sortMode);
     const lines = ["#EXTM3U"];
@@ -256,6 +271,7 @@
     setDraftSortMode,
     resolveDraftTracks,
     moveDraftTrack,
+    reorderDraftByDisplayIndex,
     exportDraftM3u,
     exportDraftText,
     energyRampPoints,
