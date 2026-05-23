@@ -378,14 +378,6 @@
       margin-bottom: 6px;
     }
 
-    #neighbors-btn.neighbor-toggle {
-      flex-shrink: 0;
-      padding: 6px 10px;
-      font-size: 11px;
-      line-height: 1.2;
-      white-space: nowrap;
-    }
-
     .neighbor-panel-queue-meta {
       flex: 1;
       min-width: 0;
@@ -1106,16 +1098,10 @@
       }
     }
 
-    .map-actions button.active,
-    #neighbors-btn.active {
+    .map-actions button.active {
       background: var(--accent-soft);
       border-color: var(--accent);
       color: var(--accent);
-    }
-
-    #neighbors-btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
     }
 
     button {
@@ -1871,11 +1857,6 @@
       gap: 8px;
     }
 
-    #neighbors-btn.neighbor-toggle {
-      width: 100%;
-      margin-bottom: 6px;
-    }
-
     .draft-toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -2227,7 +2208,7 @@
       <div class="mix-dock" id="mix-dock" aria-hidden="true">
         <div class="mix-dock-header">
           <div class="mix-dock-tabs">
-            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors">Neighbors</button>
+            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors">Neighbors<span class="mix-dock-tab-count" id="neighbors-tab-count"></span></button>
             <button type="button" class="mix-dock-tab" id="mix-tab-draft" data-tab="draft">Draft <span class="mix-dock-tab-count" id="draft-tab-count"></span></button>
           </div>
           <div class="mix-panel-meta">
@@ -2239,7 +2220,6 @@
         </div>
         <div class="mix-dock-body" id="mix-dock-body">
           <div class="mix-dock-pane" id="neighbors-pane" data-pane="neighbors">
-            <button type="button" class="secondary neighbor-toggle" id="neighbors-btn" title="Highlight mix neighbors and open mix queue">Neighbors</button>
             <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
             <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
           </div>
@@ -4195,13 +4175,11 @@
       return mixNeighbors(trackId, filteredTracks()).ids;
     }
 
-    function updateNeighborsButton(activeId, neighborCount) {
-      const btn = document.getElementById("neighbors-btn");
-      btn.disabled = !activeId;
-      btn.classList.toggle("active", state.highlightNeighbors && !!activeId);
-      btn.textContent = state.highlightNeighbors && activeId
-        ? `Neighbors (${Math.max(neighborCount - 1, 0)})`
-        : "Neighbors";
+    function updateNeighborsTab(activeId, neighborCount) {
+      const countEl = document.getElementById("neighbors-tab-count");
+      if (!countEl) return;
+      const n = state.highlightNeighbors && activeId ? Math.max(neighborCount - 1, 0) : 0;
+      countEl.textContent = n > 0 ? ` (${n})` : "";
     }
 
     function neighborTrackMetaHtml(track, score = null) {
@@ -4273,7 +4251,7 @@
         ) {
           emptyEl.hidden = false;
           emptyEl.textContent = !state.highlightNeighbors
-            ? "Tap Neighbors to highlight mix suggestions on the map."
+            ? "Press n or select a track to highlight mix neighbors."
             : "Select a track on the map.";
         }
         state.queueFocusIndex = -1;
@@ -4714,6 +4692,10 @@
     }
 
     function setNowPlaying(track, autoplay = true) {
+      if (state.mixDockTab === "neighbors" && !state.highlightNeighbors) {
+        state.highlightNeighbors = true;
+        state.neighborQueueAnchor = track.id;
+      }
       if (state.highlightNeighbors) {
         const prevAnchor = state.neighborQueueAnchor;
         const anchorId = neighborAnchorId();
@@ -5362,7 +5344,7 @@
           link.style("opacity", state.highlightNeighbors ? 0 : 1);
         }
         updateMixLinks();
-        updateNeighborsButton(active, neighbors ? neighbors.size : 0);
+        updateNeighborsTab(active, neighbors ? neighbors.size : 0);
         updateNeighborList(tracks);
       }
 
@@ -5770,8 +5752,6 @@
       audio.addEventListener("pause", updatePlayButton);
       audio.addEventListener("ended", () => playRelative(1));
 
-      document.getElementById("neighbors-btn").addEventListener("click", toggleNeighborsMode);
-
       document.getElementById("mix-tab-neighbors").addEventListener("click", () => setMixDockTab("neighbors"));
       document.getElementById("mix-tab-draft").addEventListener("click", () => setMixDockTab("draft"));
 
@@ -5857,7 +5837,7 @@
         renderGraph();
       });
 
-      updateNeighborsButton(null, 0);
+      updateNeighborsTab(null, 0);
 
       document.getElementById("reset-view-btn").addEventListener("click", resetViewWithCleanup);
 
