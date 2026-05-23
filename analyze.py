@@ -12,7 +12,7 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 11
+ANALYSIS_VERSION = 12
 WAVEFORM_BARS = 400
 WAVEFORM_VERSION = 1
 BPM_MIN = 70.0
@@ -337,23 +337,18 @@ def _detect_bpm(
         return None, None, False, np.array([]), []
 
     onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=HOP_LENGTH)
-    primary, _ = librosa.beat.beat_track(
-        onset_envelope=onset_env, sr=sr, hop_length=HOP_LENGTH
+    tempos = librosa.feature.tempo(
+        onset_envelope=onset_env,
+        sr=sr,
+        hop_length=HOP_LENGTH,
+        aggregate=None,
+        max_tempo=220,
     )
-    raw_bpm = float(np.atleast_1d(primary)[0])
-
-    try:
-        multi = librosa.feature.rhythm.tempo(
-            onset_envelope=onset_env,
-            sr=sr,
-            hop_length=HOP_LENGTH,
-            aggregate=None,
-            max_tempo=220,
-        )
-    except Exception:
-        multi = np.array([raw_bpm])
-
-    candidates = _tempo_candidates(np.concatenate([np.atleast_1d(multi), [raw_bpm]]))
+    flat = np.atleast_1d(tempos).astype(float)
+    if flat.size == 0:
+        return None, None, False, onset_env, []
+    raw_bpm = float(flat[0])
+    candidates = _tempo_candidates(flat)
     bpm, _, octave_fixed = _resolve_analysis_bpm(
         onset_env, sr, raw_bpm, candidates
     )
