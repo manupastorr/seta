@@ -3881,6 +3881,16 @@
       document.getElementById("draft-pane")?.toggleAttribute("hidden", state.mixDockTab !== "draft");
     }
 
+    function syncInitialMixDockSidebar() {
+      const draftCount = activeDraft()?.trackIds.length || 0;
+      if (draftCount > 0) {
+        showDraftPanel();
+        return;
+      }
+      state.mixDockDraftOpen = false;
+      state.mixDockNeighborsOpen = false;
+    }
+
     function showDraftPanel() {
       state.mixDockTab = "draft";
       state.mixDockDraftOpen = true;
@@ -6096,6 +6106,7 @@
       bindGraphInteraction();
       state.draftStore = TD.loadDraftStore(localStorage);
       if (!activeDraft()) ensureDraft("Set draft");
+      syncInitialMixDockSidebar();
       const res = await fetch("/api/library");
       state.data = await res.json();
       state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
