@@ -1802,6 +1802,11 @@
       background: var(--accent-soft);
     }
 
+    .mix-dock-tab:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
     .mix-dock-tab-count {
       opacity: 0.85;
     }
@@ -3743,14 +3748,12 @@
 
       if (tab === "neighbors") {
         state.draftPlayThrough = false;
-        const draft = activeDraft();
-        const anchorFromDraft =
-          !state.selectedId && draft?.trackIds.length ? draft.trackIds[0] : null;
-        const anchorId = state.selectedId || anchorFromDraft;
-        if (anchorId) {
+        if (state.selectedId) {
           state.highlightNeighbors = true;
-          state.neighborQueueAnchor = anchorId;
-          if (!state.selectedId) state.selectedId = anchorId;
+          state.neighborQueueAnchor = state.selectedId;
+        } else {
+          state.highlightNeighbors = false;
+          state.neighborQueueAnchor = null;
         }
       }
 
@@ -3785,15 +3788,22 @@
       const draft = activeDraft();
       const draftCount = draft?.trackIds.length || 0;
       const onDraftTab = state.mixDockTab === "draft";
+      const onNeighborsTab = state.mixDockTab === "neighbors";
       const draftActive = onDraftTab && state.mixDockDraftOpen;
-      const neighborsActive = state.mixDockTab === "neighbors"
+      const neighborsActive = onNeighborsTab
         && state.highlightNeighbors
-        && (!!state.neighborQueueAnchor || !!state.selectedId || draftCount > 0);
+        && !!state.selectedId;
       const showChrome = draftActive || neighborsActive;
       const showList = showChrome && (draftActive || neighborsActive);
       panel.classList.toggle("is-chrome", showChrome);
       panel.classList.toggle("is-visible", showList);
       panel.setAttribute("aria-hidden", showChrome ? "false" : "true");
+
+      const neighborsTab = document.getElementById("mix-tab-neighbors");
+      if (neighborsTab) {
+        neighborsTab.disabled = !state.selectedId;
+        neighborsTab.title = state.selectedId ? "" : "Select a track on the map first";
+      }
 
       const cue = document.getElementById("mix-dock-cue");
       const cueCount = document.getElementById("mix-dock-cue-draft-count");
@@ -4395,14 +4405,13 @@
       if (!neighborsListReady) {
         list.innerHTML = "";
         emptyEl.hidden = true;
-        if (
-          state.mixDockTab === "neighbors"
-          && (!!state.selectedId || (activeDraft()?.trackIds.length || 0) > 0)
-        ) {
+        if (state.mixDockTab === "neighbors") {
           emptyEl.hidden = false;
-          emptyEl.textContent = !state.highlightNeighbors
-            ? "Press n or select a track to highlight mix neighbors."
-            : "Select a track on the map.";
+          emptyEl.textContent = !state.selectedId
+            ? "Select a track on the map to see mix neighbors."
+            : !state.highlightNeighbors
+              ? "Press n to highlight mix neighbors on the map."
+              : "Select a track on the map.";
         }
         state.queueFocusIndex = -1;
         updateMixDockChrome();
@@ -5144,6 +5153,10 @@
 
       if ((event.key === "m" || event.key === "M") && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
+        if (!state.selectedId) {
+          setPlayerIdle("Select a track on the graph first");
+          return;
+        }
         setMixDockTab("neighbors");
         return;
       }
