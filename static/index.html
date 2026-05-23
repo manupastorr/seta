@@ -3803,12 +3803,7 @@
         return;
       }
       if (draftTrackIdSet().has(trackId)) return;
-      if (addTrackToActiveDraft(trackId)) {
-        setMixDockTab("draft");
-        state.mixDockDraftOpen = true;
-        updateMixDockChrome();
-        updateDraftUi();
-      }
+      addTrackToActiveDraft(trackId);
     }
 
     function toggleFinalOnSelectedDraft() {
