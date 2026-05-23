@@ -12,7 +12,7 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 10
+ANALYSIS_VERSION = 11
 WAVEFORM_BARS = 400
 WAVEFORM_VERSION = 1
 BPM_MIN = 70.0
@@ -364,6 +364,20 @@ def _clip01(value: float) -> float:
     return float(np.clip(value, 0.0, 1.0))
 
 
+def _harmonic_voiced_strength(y_harm: np.ndarray, sr: int) -> float:
+    """Estimate tonal voicing via harmonic periodicity (avoids librosa.yin native crashes)."""
+    window = min(len(y_harm), sr * 12)
+    segment = y_harm[:window]
+    if len(segment) < sr // 2:
+        return 0.0
+    ac = librosa.autocorrelate(segment, max_size=sr // 4)
+    if len(ac) < 3:
+        return 0.0
+    ac = ac / (float(ac[0]) + 1e-9)
+    peak = float(np.max(ac[1:]))
+    return _clip01((peak - 0.15) / 0.55)
+
+
 def _detect_vocals(y: np.ndarray, sr: int) -> tuple[str, float | None]:
     """Heuristic vocal presence: yes, no, or unclear, plus confidence in that label."""
     if len(y) < sr * 8:
@@ -385,16 +399,7 @@ def _detect_vocals(y: np.ndarray, sr: int) -> tuple[str, float | None]:
     edge_band = float(np.mean(np.concatenate([mel_mean[:5], mel_mean[28:]])))
     vocal_contrast = vocal_band - edge_band
 
-    try:
-        f0 = librosa.yin(
-            y_harm,
-            fmin=librosa.note_to_hz("C2"),
-            fmax=librosa.note_to_hz("C5"),
-            sr=sr,
-        )
-        voiced_strength = float(np.mean(np.isfinite(f0)))
-    except Exception:
-        voiced_strength = 0.0
+    voiced_strength = _harmonic_voiced_strength(y_harm, sr)
 
     flatness = librosa.feature.spectral_flatness(y=y_harm)[0]
     tonal_harm = _clip01(1.0 - float(np.mean(flatness)) * 10.0)

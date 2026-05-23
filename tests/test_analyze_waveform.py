@@ -16,7 +16,7 @@ from analyze import (
 
 class AnalyzeWaveformTests(unittest.TestCase):
     def test_analysis_version_bumped(self) -> None:
-        self.assertEqual(ANALYSIS_VERSION, 10)
+        self.assertEqual(ANALYSIS_VERSION, 11)
 
     def test_compute_waveform_peaks_shape(self) -> None:
         sr = 22050
