@@ -17,16 +17,21 @@ LIBRARY_PATH = APP_DIR / "library.json"
 
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 TRACK_INDEX: dict[str, dict] = {}
+LIBRARY_CACHE: dict | None = None
 
 
-def load_library() -> dict:
+def load_library(*, force: bool = False) -> dict:
+    global LIBRARY_CACHE
+    if LIBRARY_CACHE is not None and not force:
+        return LIBRARY_CACHE
     if not LIBRARY_PATH.exists():
-        return {"tracks": [], "edges": [], "track_count": 0}
-    data = json.loads(LIBRARY_PATH.read_text())
+        LIBRARY_CACHE = {"tracks": [], "edges": [], "track_count": 0}
+    else:
+        LIBRARY_CACHE = json.loads(LIBRARY_PATH.read_text())
     TRACK_INDEX.clear()
-    for track in data.get("tracks", []):
+    for track in LIBRARY_CACHE.get("tracks", []):
         TRACK_INDEX[track["id"]] = track
-    return data
+    return LIBRARY_CACHE
 
 
 def allowed_path(path: Path) -> bool:
@@ -46,9 +51,9 @@ def api_library() -> Response:
 
 @app.get("/api/audio/<track_id>")
 def api_audio(track_id: str) -> Response:
-    track = TRACK_INDEX.get(track_id) or next(
-        (t for t in load_library().get("tracks", []) if t["id"] == track_id), None
-    )
+    if not TRACK_INDEX and LIBRARY_PATH.exists():
+        load_library()
+    track = TRACK_INDEX.get(track_id)
     if not track:
         abort(404)
     path = Path(track["path"])
