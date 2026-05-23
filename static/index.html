@@ -2406,7 +2406,7 @@
             </div>
             <div class="draft-ramp" id="draft-ramp" hidden aria-hidden="true"></div>
             <ul class="draft-list" id="draft-list" role="listbox" aria-label="Set draft tracks"></ul>
-            <p class="draft-empty" id="draft-empty">No tracks yet — select a track and press <kbd>a</kbd> or + to add.</p>
+            <p class="draft-empty" id="draft-empty">No tracks yet — select a track and press <kbd>a</kbd> to add.</p>
           </div>
         </div>
       </div>
@@ -2516,15 +2516,13 @@
           { keys: "↑ ↓", desc: "Move in queue when sidebar is open" },
           { keys: "Enter", desc: "Play highlighted queue track" },
           { keys: "⌘ Enter", desc: "Set focused neighbor as anchor (0) and play" },
-          { keys: "+", desc: "Add focused queue track to draft" },
-          { keys: "−", desc: "Remove focused queue track from draft" },
         ],
       },
       {
         title: "Set draft",
         rows: [
-          { keys: "a", desc: "Add selected track to draft" },
-          { keys: "Backspace", desc: "Remove selected track from draft" },
+          { keys: "a", desc: "Add focused queue or selected track to draft" },
+          { keys: "Backspace", desc: "Remove focused queue or selected track from draft" },
           { keys: "d", desc: "Open draft tab and sidebar" },
           { keys: "f", desc: "Toggle final mark on selected draft track" },
           { keys: "p", desc: "Play draft from start" },
@@ -3795,11 +3793,17 @@
     }
 
     function addSelectedToDraft() {
-      if (!state.selectedId) {
+      let trackId = null;
+      if (canQueueKeyboardNav()) {
+        trackId = queueFocusTrackId();
+      }
+      if (!trackId) trackId = state.selectedId;
+      if (!trackId) {
         setPlayerIdle("Select a track on the map first");
         return;
       }
-      if (addTrackToActiveDraft(state.selectedId)) {
+      if (draftTrackIdSet().has(trackId)) return;
+      if (addTrackToActiveDraft(trackId)) {
         setMixDockTab("draft");
         state.mixDockDraftOpen = true;
         updateMixDockChrome();
@@ -5186,15 +5190,29 @@
       return items[idx]?.dataset.trackId || null;
     }
 
-    function toggleDraftForQueueFocus(add) {
-      if (!canQueueKeyboardNav() || state.mixDockTab !== "neighbors") return;
+    function removeFocusedFromDraft() {
+      if (!canQueueKeyboardNav()) return false;
       const trackId = queueFocusTrackId();
-      if (!trackId) return;
-      if (add) {
-        if (!draftTrackIdSet().has(trackId)) addTrackToActiveDraft(trackId);
-      } else if (draftTrackIdSet().has(trackId)) {
-        removeTrackFromActiveDraft(trackId);
+      if (!trackId || !draftTrackIdSet().has(trackId)) return false;
+      const snap = {
+        tab: state.mixDockTab,
+        index: state.queueFocusIndex,
+        trackId,
+      };
+      if (!removeTrackFromActiveDraft(trackId)) return false;
+      const items = neighborQueueItems();
+      if (!items.length) {
+        state.queueFocusIndex = -1;
+        return true;
       }
+      if (snap.tab === "neighbors") {
+        const idx = items.findIndex(el => el.dataset.trackId === snap.trackId);
+        state.queueFocusIndex = idx >= 0 ? idx : 0;
+      } else {
+        state.queueFocusIndex = Math.min(Math.max(snap.index, 0), items.length - 1);
+      }
+      syncQueueFocusHighlight();
+      return true;
     }
 
     function activateQueueFocus() {
@@ -5415,6 +5433,10 @@
       }
 
       if (event.key === "Backspace" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (removeFocusedFromDraft()) {
+          event.preventDefault();
+          return;
+        }
         if (state.selectedId && draftTrackIdSet().has(state.selectedId)) {
           event.preventDefault();
           removeTrackFromActiveDraft(state.selectedId);
@@ -5499,20 +5521,6 @@
       if (canQueueKeyboardNav() && !event.shiftKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
         event.preventDefault();
         moveQueueFocus(event.key === "ArrowDown" ? 1 : -1);
-        return;
-      }
-
-      if (canQueueKeyboardNav() && state.mixDockTab === "neighbors" && !event.ctrlKey && !event.metaKey && !event.altKey
-        && (event.key === "+" || event.key === "=" || event.code === "Equal")) {
-        event.preventDefault();
-        toggleDraftForQueueFocus(true);
-        return;
-      }
-
-      if (canQueueKeyboardNav() && state.mixDockTab === "neighbors" && !event.ctrlKey && !event.metaKey && !event.altKey
-        && (event.key === "-" || event.key === "_" || event.code === "Minus")) {
-        event.preventDefault();
-        toggleDraftForQueueFocus(false);
         return;
       }
 
