@@ -3600,6 +3600,20 @@
       if (tab !== "neighbors" && tab !== "draft") return;
       state.mixDockTab = tab;
       state.mixDockCollapsed = false;
+
+      if (tab === "neighbors") {
+        state.draftPlayThrough = false;
+        const draft = activeDraft();
+        const anchorFromDraft =
+          !state.selectedId && draft?.trackIds.length ? draft.trackIds[0] : null;
+        const anchorId = state.selectedId || anchorFromDraft;
+        if (anchorId) {
+          state.highlightNeighbors = true;
+          state.neighborQueueAnchor = anchorId;
+          if (!state.selectedId) state.selectedId = anchorId;
+        }
+      }
+
       document.getElementById("mix-tab-neighbors")?.classList.toggle("active", tab === "neighbors");
       document.getElementById("mix-tab-draft")?.classList.toggle("active", tab === "draft");
       document.getElementById("neighbors-pane")?.toggleAttribute("hidden", tab !== "neighbors");
@@ -3610,6 +3624,9 @@
       updateMixDockChrome();
       updateDraftUi();
       updateNeighborList(filteredTracks());
+      if (tab === "neighbors" && state.highlightNeighbors && state.neighborQueueAnchor) {
+        focusNeighborGroup(state.neighborQueueAnchor);
+      }
       renderGraph();
     }
 
@@ -3629,8 +3646,8 @@
       const draftCount = draft?.trackIds.length || 0;
       const showChrome = !!state.selectedId || draftCount > 0 || state.mixDockTab === "draft";
       const showList = showChrome && (
-        (state.mixDockTab === "neighbors" && state.highlightNeighbors && !!neighborAnchorId())
-        || state.mixDockTab === "draft"
+        state.mixDockTab === "draft"
+        || (state.mixDockTab === "neighbors" && (!!state.selectedId || draftCount > 0))
       );
       panel.classList.toggle("is-chrome", showChrome);
       panel.classList.toggle("is-visible", showList);
@@ -4139,10 +4156,21 @@
       if (!panel || !list || !emptyEl) return;
 
       const anchorId = neighborAnchorId();
-      const showList = state.mixDockTab === "neighbors" && state.highlightNeighbors && !!anchorId;
-      if (!showList) {
+      const neighborsListReady = state.mixDockTab === "neighbors"
+        && state.highlightNeighbors && !!anchorId;
+
+      if (!neighborsListReady) {
         list.innerHTML = "";
         emptyEl.hidden = true;
+        if (
+          state.mixDockTab === "neighbors"
+          && (!!state.selectedId || (activeDraft()?.trackIds.length || 0) > 0)
+        ) {
+          emptyEl.hidden = false;
+          emptyEl.textContent = !state.highlightNeighbors
+            ? "Tap Neighbors to highlight mix suggestions on the map."
+            : "Select a track on the map.";
+        }
         state.queueFocusIndex = -1;
         updateMixDockChrome();
         updateDraftUi();
@@ -4166,6 +4194,7 @@
           playing: state.playingId === anchor.id,
         });
         emptyEl.hidden = false;
+        emptyEl.textContent = "No mixable neighbors in current filters.";
       } else {
         emptyEl.hidden = true;
         list.innerHTML = [
