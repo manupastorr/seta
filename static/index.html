@@ -2470,6 +2470,7 @@
   <script>
     const PB = TrackGraphPlayback;
     const TD = TrackGraphDraft;
+    const mixScore = PB.mixScore;
 
     const CAMELOT_WHEEL_SIZE = 158;
 
@@ -4505,35 +4506,6 @@
         source: edgeEndpointId(e.source),
         target: edgeEndpointId(e.target),
       }));
-    }
-
-    function mixScore(a, b) {
-      if (!a.key || !b.key || a.bpm == null || b.bpm == null) return 0;
-
-      const ka = a.key.toUpperCase();
-      const kb = b.key.toUpperCase();
-      let harmonic = 0;
-      if (ka === kb) harmonic = 1;
-      else {
-        const na = ka.slice(0, -1), la = ka.slice(-1);
-        const nb = kb.slice(0, -1), lb = kb.slice(-1);
-        if (na === nb && la !== lb) harmonic = 0.82;
-        else {
-          let diff = Math.abs(Number(na) - Number(nb));
-          diff = Math.min(diff, 12 - diff);
-          if (la === lb && diff === 1) harmonic = 0.72;
-          else if (diff === 1) harmonic = 0.55;
-        }
-      }
-      if (!harmonic) return 0;
-
-      const diff = Math.abs(a.bpm - b.bpm);
-      let bpmFactor = 0;
-      if (diff <= 1) bpmFactor = 1;
-      else if (diff <= 2) bpmFactor = 0.9;
-      else if (diff <= 4) bpmFactor = 0.7;
-      else if (diff <= 6) bpmFactor = 0.45;
-      return harmonic * bpmFactor;
     }
 
     function mixNeighbors(trackId, tracks) {
