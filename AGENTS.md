@@ -37,6 +37,8 @@ Copy `.env.example` → `.env` per machine. Do not commit `.env`.
 
 `start.sh` creates `.venv` on first run, installs `requirements.txt`, sources `.env` if present, then scans and execs `server.py` (it does not auto-open a browser).
 
+`server.py` reloads `library.json` automatically when the file changes on disk (mtime check). `POST /api/library/reload` forces a refresh without restarting.
+
 After changing `analyze.py`, bump `ANALYSIS_VERSION` so the cache re-analyzes stale entries.
 
 ## Tests
@@ -75,11 +77,11 @@ Unified resolver in `analyze.py` (see `ANALYSIS_VERSION`):
 
 1. **Tagged ≥100 BPM** — trust store tag (Soundeo/Beatport full-tempo tags).
 2. **Tagged 68–92 BPM** — half-time tag zone; double only when librosa also anchors ~140–165 BPM (peak techno) or ambiguous raw + close margin. Organic/cumbia tags stay slow.
-3. **No tag** — score librosa octave candidates; prefer primary tempo when a half-time octave was picked; lift obvious psy/techno false halves (~72 → ~140 when scores are close). Prefer half-time when librosa primary is ~155–180 but onset favours ~78–95 (downtempo/organic).
+3. **No tag** — `librosa.feature.tempo` on onset strength (not `beat_track`; avoids native crashes on some librosa builds), then score octave candidates; prefer primary tempo when a half-time octave was picked; lift obvious psy/techno false halves (~72 → ~140 when scores are close). Prefer half-time when librosa primary is ~155–180 but onset favours ~78–95 (downtempo/organic).
 
 UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confidence`, `vocals`, `vocals_confidence`
 
-`vocals` is heuristic (`yes` / `no` / `unclear`) from harmonic mid-band + `yin` pitch voicing on the first ~45s — not speech recognition. Stricter thresholds in v9; show the player badge only when `vocals_confidence` ≥ 0.45.
+`vocals` is heuristic (`yes` / `no` / `unclear`) from HPSS harmonic/percussive split, mel-band contrast, and harmonic periodicity (autocorrelation — not `librosa.yin`) on the first ~45s — not speech recognition. Show the player badge only when `vocals_confidence` ≥ 0.45.
 
 Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars from the first ~90s analysis window — intro/main preview, not full-track shape).
 
@@ -87,7 +89,7 @@ Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.js
 
 ## UI conventions
 
-- Single frontend file: `static/index.html` (D3, no build step)
+- Single frontend file: `static/index.html` (D3 from `static/vendor/d3.min.js`, no build step)
 - Bottom **player dock** (full-width, SoundCloud-style): transport, title/artist, badges, wide waveform; left **mix dock** holds Neighbors/Draft tabs, mix queue, and set draft (add/discard, energy ramp, export); filters stay in the top bar
 - **Set draft** — local shortlist with add/remove (`a` / `Backspace` on queue focus or map selection), final marks (★), notes, energy/BPM/manual sort, draft-only map filter, M3U + text export; persisted in `localStorage` (`seta-drafts-v1`)
 - **Keyboard shortcuts** (`?` opens help): Space play/pause, ←/→ prev/next track, Shift+←/→ seek, `/` search, `s` toggle mix sidebar, `m` neighbors tab, `n` neighbor mode on map, `a`/`Backspace` add/remove from draft, `d` draft tab, `f` toggle final, `p` play draft, `e`/`b` sort draft by energy/BPM, `z`/`k` toggle set zones/Camelot panels, `r` reset view, ↑/↓ mix queue when sidebar open, Esc peels filters/search/sidebar/neighbor mode/view
