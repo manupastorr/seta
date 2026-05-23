@@ -2288,7 +2288,7 @@
           <div class="time-row">
             <span id="time-current">0:00</span>
             <span id="time-total">0:00</span>
-            <span class="player-shortcuts-hint"><kbd>?</kbd> shortcuts · <kbd>/</kbd> search</span>
+            <span class="player-shortcuts-hint"><kbd>?</kbd> shortcuts · <kbd>/</kbd> search · <kbd>a</kbd> add · <kbd>d</kbd> draft</span>
           </div>
         </div>
       </div>
@@ -2348,9 +2348,10 @@
       {
         title: "Mix queue",
         rows: [
+          { keys: "m", desc: "Open neighbors tab" },
+          { keys: "n", desc: "Toggle neighbors on map" },
           { keys: "↑ ↓", desc: "Move in queue (neighbors or draft tab)" },
           { keys: "Enter", desc: "Play highlighted queue track" },
-          { keys: "n", desc: "Toggle neighbors" },
         ],
       },
       {
@@ -2359,6 +2360,10 @@
           { keys: "a", desc: "Add selected track to draft" },
           { keys: "Backspace", desc: "Remove selected track from draft" },
           { keys: "d", desc: "Open draft tab" },
+          { keys: "f", desc: "Toggle final mark on selected draft track" },
+          { keys: "p", desc: "Play draft from start" },
+          { keys: "e", desc: "Sort draft by energy" },
+          { keys: "b", desc: "Sort draft by BPM" },
         ],
       },
       {
@@ -3613,6 +3618,32 @@
       if (addTrackToActiveDraft(state.selectedId)) {
         setMixDockTab("draft");
       }
+    }
+
+    function toggleFinalOnSelectedDraft() {
+      if (!state.selectedId) {
+        setPlayerIdle("Select a track on the map first");
+        return;
+      }
+      const draft = activeDraft();
+      if (!draft || !draftTrackIdSet().has(state.selectedId)) {
+        setPlayerIdle("Track is not in the draft");
+        return;
+      }
+      TD.toggleFinalInDraft(draft, state.selectedId);
+      persistDraftState();
+      updateDraftUi();
+      renderGraph();
+    }
+
+    function setActiveDraftSort(sortMode) {
+      const draft = activeDraft();
+      if (!draft) return;
+      TD.setDraftSortMode(draft, sortMode);
+      persistDraftState();
+      syncPlayQueue();
+      updateDraftUi();
+      renderGraph();
     }
 
     function setMixDockTab(tab) {
@@ -5002,6 +5033,36 @@
       if ((event.key === "d" || event.key === "D") && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         setMixDockTab("draft");
+        return;
+      }
+
+      if ((event.key === "m" || event.key === "M") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        setMixDockTab("neighbors");
+        return;
+      }
+
+      if ((event.key === "f" || event.key === "F") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        toggleFinalOnSelectedDraft();
+        return;
+      }
+
+      if ((event.key === "p" || event.key === "P") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        playDraftFromStart();
+        return;
+      }
+
+      if ((event.key === "e" || event.key === "E") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        setActiveDraftSort("energy");
+        return;
+      }
+
+      if ((event.key === "b" || event.key === "B") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        setActiveDraftSort("bpm");
         return;
       }
 
