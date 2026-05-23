@@ -6,6 +6,7 @@
   <title>Seta 🍄</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="/static/playback.js"></script>
+  <script src="/static/draft.js"></script>
   <script src="/static/renderSafe.js"></script>
   <script src="/static/mixLinks.js"></script>
   <style>
@@ -179,10 +180,9 @@
     }
 
     .filter-group-bpm {
-      flex: 0 0 170px;
-      width: 170px;
-      max-width: 170px;
-      min-width: 170px;
+      flex: 1 1 240px;
+      min-width: 220px;
+      max-width: 300px;
       align-items: center;
       gap: 4px;
     }
@@ -357,7 +357,7 @@
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
-      width: 248px;
+      width: 268px;
     }
 
     .mix-dock.is-visible.is-collapsed {
@@ -456,12 +456,6 @@
       text-transform: uppercase;
       color: var(--muted);
       line-height: 1;
-    }
-
-    .neighbor-panel-count {
-      font-size: 10px;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
     }
 
     .neighbor-list {
@@ -835,9 +829,13 @@
     }
 
     #source-filters {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      display: flex;
+      flex-wrap: nowrap;
       gap: 5px;
+    }
+
+    #source-filters .chip {
+      white-space: nowrap;
     }
 
     #view-controls {
@@ -1792,6 +1790,343 @@
       background: rgba(107, 79, 216, 0.08);
       box-shadow: inset 0 0 0 1px rgba(107, 79, 216, 0.2);
     }
+
+    .mix-dock-tabs {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .mix-dock-tab {
+      border: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font: inherit;
+      font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .mix-dock-tab.active {
+      color: var(--text);
+      border-color: rgba(107, 79, 216, 0.35);
+      background: var(--accent-soft);
+    }
+
+    .mix-dock-tab-count {
+      opacity: 0.85;
+    }
+
+    .mix-dock-header {
+      flex-shrink: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 8px;
+      margin-bottom: 0;
+    }
+
+    .mix-dock.is-visible .mix-dock-header {
+      margin-bottom: 6px;
+    }
+
+    .mix-dock-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mix-dock.is-collapsed .mix-dock-body {
+      display: none;
+    }
+
+    .mix-dock-pane {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mix-dock-pane[hidden] {
+      display: none !important;
+    }
+
+    .mix-dock.is-chrome:not(.is-visible) .mix-dock-body,
+    .mix-dock.is-chrome:not(.is-visible) .mix-panel-meta {
+      display: none;
+    }
+
+    .mix-panel-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #neighbors-btn.neighbor-toggle {
+      width: 100%;
+      margin-bottom: 6px;
+    }
+
+    .draft-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .draft-name-input {
+      flex: 1 1 100%;
+      min-width: 0;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font: inherit;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .draft-count {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .draft-sort-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .draft-sort-row .chip {
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+
+    .draft-actions {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .draft-actions .secondary {
+      padding: 5px 8px;
+      font-size: 10px;
+    }
+
+    .draft-ramp {
+      width: 100%;
+      height: 36px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+    }
+
+    .draft-ramp svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .draft-ramp-line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .draft-ramp-dot {
+      fill: var(--accent);
+    }
+
+    .draft-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .draft-list > li {
+      margin-bottom: 4px;
+    }
+
+    .draft-item {
+      width: 100%;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 6px;
+      align-items: start;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.55);
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .draft-item:hover {
+      border-color: rgba(107, 79, 216, 0.18);
+      background: rgba(255, 255, 255, 0.85);
+    }
+
+    .draft-item.is-active,
+    .draft-item.is-playing {
+      border-color: rgba(107, 79, 216, 0.35);
+      background: var(--accent-soft);
+    }
+
+    .draft-item.is-final .draft-star {
+      color: #f5a623;
+    }
+
+    .draft-item .draft-row {
+      min-width: 0;
+      width: 100%;
+      text-align: left;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      padding: 2px 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      align-items: start;
+    }
+
+    .draft-item .draft-row:hover,
+    .draft-item .draft-row.is-active,
+    .draft-item .draft-row.is-active:hover {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+
+    .draft-item .draft-row .neighbor-meta {
+      width: auto;
+      min-width: 0;
+      justify-content: flex-start;
+    }
+
+    .draft-item .draft-row .neighbor-meta-row-stats {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: flex-start;
+      gap: 2px;
+      flex-wrap: nowrap;
+      width: auto;
+      min-width: 0;
+    }
+
+    .draft-item .draft-row .neighbor-title {
+      line-height: 14px;
+    }
+
+    .draft-star {
+      border: none;
+      background: none;
+      padding: 0;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted);
+      align-self: start;
+      margin-top: 1px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .draft-remove {
+      border: none;
+      background: none;
+      padding: 0 2px;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted);
+      align-self: start;
+      margin-top: 1px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .draft-remove:hover {
+      color: #c62828;
+    }
+
+    .draft-note-input {
+      grid-column: 1 / -1;
+      width: 100%;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font: inherit;
+      font-size: 10px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .draft-empty {
+      margin: 0;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .node.in-draft circle.core {
+      stroke: #f5a623;
+      stroke-width: 1.5px;
+    }
+
+    .node.in-draft.selected circle.core,
+    .node.in-draft.playing circle.core {
+      stroke-width: 1.75px;
+    }
+
+    .node.in-draft-final circle.core {
+      filter: drop-shadow(0 0 3px rgba(245, 166, 35, 0.45));
+    }
+
+    .mix-dock.is-chrome:not(.is-visible) .mix-dock-tabs {
+      margin-bottom: 0;
+    }
+
+    .player-draft-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      margin-left: 4px;
+    }
+
+    .player-draft-actions .secondary {
+      min-width: 28px;
+      padding: 4px 6px;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    #draft-only-chip.active {
+      border-color: rgba(245, 166, 35, 0.45);
+      background: rgba(245, 166, 35, 0.12);
+    }
   </style>
 </head>
 <body>
@@ -1816,6 +2151,7 @@
             <button class="chip active" data-source="all">All</button>
             <button class="chip" data-source="tracks">Library</button>
             <button class="chip" data-source="to_curate">Curate</button>
+            <button class="chip" id="draft-only-chip" data-source="draft-only" title="Show only tracks in the active set draft">Draft only</button>
           </div>
         </div>
 
@@ -1859,20 +2195,44 @@
     </header>
 
     <div class="workspace" id="workspace">
-      <div class="mix-dock" id="neighbor-panel" aria-hidden="true">
-        <div class="neighbor-panel-header">
-          <button type="button" class="secondary neighbor-toggle" id="neighbors-btn" title="Highlight mix neighbors and open mix queue">Neighbors</button>
-          <div class="neighbor-panel-queue-meta">
-            <button type="button" class="neighbor-panel-toggle" id="neighbor-panel-toggle" aria-expanded="true" aria-controls="neighbor-panel-body">
+      <div class="mix-dock" id="mix-dock" aria-hidden="true">
+        <div class="mix-dock-header">
+          <div class="mix-dock-tabs">
+            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors">Neighbors</button>
+            <button type="button" class="mix-dock-tab" id="mix-tab-draft" data-tab="draft">Draft <span class="mix-dock-tab-count" id="draft-tab-count"></span></button>
+          </div>
+          <div class="mix-panel-meta">
+            <button type="button" class="neighbor-panel-toggle" id="mix-panel-toggle" aria-expanded="true" aria-controls="mix-dock-body">
               <span class="neighbor-panel-chevron" aria-hidden="true"></span>
-              <span class="neighbor-panel-title">Mix queue</span>
+              <span class="neighbor-panel-title" id="mix-panel-title">Mix queue</span>
             </button>
-            <span class="neighbor-panel-count" id="neighbor-panel-count"></span>
           </div>
         </div>
-        <div class="neighbor-panel-body" id="neighbor-panel-body">
-          <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
-          <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
+        <div class="mix-dock-body" id="mix-dock-body">
+          <div class="mix-dock-pane" id="neighbors-pane" data-pane="neighbors">
+            <button type="button" class="secondary neighbor-toggle" id="neighbors-btn" title="Highlight mix neighbors and open mix queue">Neighbors</button>
+            <ul class="neighbor-list" id="neighbor-list" role="listbox" aria-label="Mix neighbors"></ul>
+            <p class="neighbor-empty" id="neighbor-empty" hidden>No mixable neighbors in current filters.</p>
+          </div>
+          <div class="mix-dock-pane" id="draft-pane" data-pane="draft" hidden>
+            <div class="draft-toolbar">
+              <input type="text" class="draft-name-input" id="draft-name-input" placeholder="Set draft name" aria-label="Set draft name" />
+              <span class="draft-count" id="draft-count"></span>
+              <div class="draft-sort-row" id="draft-sort-row">
+                <button type="button" class="chip active" data-draft-sort="energy">Energy</button>
+                <button type="button" class="chip" data-draft-sort="bpm">BPM</button>
+                <button type="button" class="chip" data-draft-sort="manual">Manual</button>
+              </div>
+              <div class="draft-actions">
+                <button type="button" class="secondary" id="draft-play-btn">Play draft</button>
+                <button type="button" class="secondary" id="draft-export-m3u-btn">Export M3U</button>
+                <button type="button" class="secondary" id="draft-copy-btn">Copy list</button>
+              </div>
+            </div>
+            <div class="draft-ramp" id="draft-ramp" hidden aria-hidden="true"></div>
+            <ul class="draft-list" id="draft-list" role="listbox" aria-label="Set draft tracks"></ul>
+            <p class="draft-empty" id="draft-empty">No tracks yet — select a track and press <kbd>a</kbd> or + to add.</p>
+          </div>
         </div>
       </div>
 
@@ -1893,6 +2253,10 @@
           <button class="secondary icon" id="prev-btn" type="button" title="Previous in selection">◀</button>
           <button class="icon transport-main" id="play-btn" type="button" title="Play / Pause" disabled>▶</button>
           <button class="secondary icon" id="next-btn" type="button" title="Next in selection">▶|</button>
+          <div class="player-draft-actions">
+            <button class="secondary" id="draft-add-btn" type="button" title="Add to set draft (a)" disabled>+</button>
+            <button class="secondary" id="draft-remove-btn" type="button" title="Remove from set draft" hidden>−</button>
+          </div>
         </div>
         <div class="player-main">
           <div class="player-trackline">
@@ -1929,6 +2293,7 @@
 
   <script>
     const PB = TrackGraphPlayback;
+    const TD = TrackGraphDraft;
 
     const CAMELOT_WHEEL_SIZE = 168;
 
@@ -1969,9 +2334,17 @@
       {
         title: "Mix queue",
         rows: [
-          { keys: "↑ ↓", desc: "Move in queue (neighbors on)" },
+          { keys: "↑ ↓", desc: "Move in queue (neighbors or draft tab)" },
           { keys: "Enter", desc: "Play highlighted queue track" },
           { keys: "n", desc: "Toggle neighbors" },
+        ],
+      },
+      {
+        title: "Set draft",
+        rows: [
+          { keys: "a", desc: "Add selected track to draft" },
+          { keys: "Backspace", desc: "Remove selected track from draft" },
+          { keys: "d", desc: "Open draft tab" },
         ],
       },
       {
@@ -2039,6 +2412,7 @@
       highlightNeighbors: false,
       neighborQueueAnchor: null,
       neighborQueueCollapsed: false,
+      mixDockCollapsed: false,
       momentsLegendCollapsed: false,
       camelotLegendCollapsed: false,
       layout: "mix",
@@ -2072,7 +2446,12 @@
       neighborFocusTimer: null,
       shortcutsOpen: false,
       queueFocusIndex: -1,
-      energyDisplayDomain: null
+      energyDisplayDomain: null,
+      draftStore: { activeId: null, drafts: {} },
+      mixDockTab: "neighbors",
+      mixDockCollapsed: false,
+      draftOnlyFilter: false,
+      draftPlayThrough: false,
     };
 
     const audio = document.getElementById("audio");
@@ -2506,7 +2885,7 @@
     }
 
     function mixDockWidth() {
-      const panel = document.getElementById("neighbor-panel");
+      const panel = document.getElementById("mix-dock");
       if (!panel?.classList.contains("is-chrome") || panel.classList.contains("is-collapsed")) return 0;
       return Math.ceil(panel.getBoundingClientRect().width) + 10;
     }
@@ -2636,7 +3015,10 @@
       const { plotWidth, plotHeight } = plotSize();
       if (px < 0 || py < 0 || px > plotWidth || py > plotHeight) return;
       const track = closestTrackAt(px, py, state.renderedTracks, LOUPE.clickPickRadius);
-      if (track) setNowPlaying(track);
+      if (track) {
+        state.draftPlayThrough = false;
+        setNowPlaying(track);
+      }
     }
 
     function bindGraphInteraction() {
@@ -3141,10 +3523,274 @@
     }
 
     function playbackSelection() {
+      if (state.highlightNeighbors && state.neighborQueueAnchor) {
+        return {
+          highlightNeighbors: true,
+          neighborQueueAnchor: state.neighborQueueAnchor,
+        };
+      }
+      const draft = activeDraft();
+      if (state.draftPlayThrough && draft?.trackIds.length) {
+        return TD.buildDraftPlaybackSelection(true, draft.trackIds, draft.sortMode);
+      }
       return {
-        highlightNeighbors: state.highlightNeighbors,
-        neighborQueueAnchor: state.neighborQueueAnchor,
+        highlightNeighbors: false,
+        neighborQueueAnchor: null,
       };
+    }
+
+    function tracksByIdMap() {
+      return new Map((state.data?.tracks || []).map(t => [t.id, t]));
+    }
+
+    function activeDraft() {
+      return TD.getActiveDraft(state.draftStore);
+    }
+
+    function persistDraftState() {
+      TD.saveDraftStore(localStorage, state.draftStore);
+    }
+
+    function ensureDraft(name = "Set draft") {
+      const draft = TD.ensureActiveDraft(state.draftStore, name);
+      persistDraftState();
+      return draft;
+    }
+
+    function draftTrackIdSet() {
+      const draft = activeDraft();
+      return new Set(draft?.trackIds || []);
+    }
+
+    function draftFinalIdSet() {
+      const draft = activeDraft();
+      return new Set(draft?.finalIds || []);
+    }
+
+    function addTrackToActiveDraft(trackId) {
+      if (!trackId) return false;
+      const draft = ensureDraft();
+      const before = draft.trackIds.length;
+      TD.addTrackToDraft(draft, trackId);
+      if (draft.trackIds.length === before) return false;
+      persistDraftState();
+      updateDraftUi();
+      renderGraph();
+      return true;
+    }
+
+    function removeTrackFromActiveDraft(trackId) {
+      const draft = activeDraft();
+      if (!draft || !trackId) return false;
+      const before = draft.trackIds.length;
+      TD.removeTrackFromDraft(draft, trackId);
+      if (draft.trackIds.length === before) return false;
+      persistDraftState();
+      updateDraftUi();
+      renderGraph();
+      return true;
+    }
+
+    function addSelectedToDraft() {
+      if (!state.selectedId) {
+        setPlayerIdle("Select a track on the map first");
+        return;
+      }
+      if (addTrackToActiveDraft(state.selectedId)) {
+        setMixDockTab("draft");
+      }
+    }
+
+    function setMixDockTab(tab) {
+      if (tab !== "neighbors" && tab !== "draft") return;
+      state.mixDockTab = tab;
+      state.mixDockCollapsed = false;
+      document.getElementById("mix-tab-neighbors")?.classList.toggle("active", tab === "neighbors");
+      document.getElementById("mix-tab-draft")?.classList.toggle("active", tab === "draft");
+      document.getElementById("neighbors-pane")?.toggleAttribute("hidden", tab !== "neighbors");
+      document.getElementById("draft-pane")?.toggleAttribute("hidden", tab !== "draft");
+      const title = document.getElementById("mix-panel-title");
+      if (title) title.textContent = tab === "draft" ? "Set draft" : "Mix queue";
+      syncPlayQueue();
+      updateMixDockChrome();
+      updateDraftUi();
+      updateNeighborList(filteredTracks());
+      renderGraph();
+    }
+
+    function syncMixDockCollapse() {
+      const panel = document.getElementById("mix-dock");
+      const toggle = document.getElementById("mix-panel-toggle");
+      if (!panel || !toggle) return;
+      const collapsed = state.mixDockCollapsed && panel.classList.contains("is-visible");
+      panel.classList.toggle("is-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+
+    function updateMixDockChrome() {
+      const panel = document.getElementById("mix-dock");
+      if (!panel) return;
+      const draft = activeDraft();
+      const draftCount = draft?.trackIds.length || 0;
+      const showChrome = !!state.selectedId || draftCount > 0 || state.mixDockTab === "draft";
+      const showList = showChrome && (
+        (state.mixDockTab === "neighbors" && state.highlightNeighbors && !!neighborAnchorId())
+        || state.mixDockTab === "draft"
+      );
+      panel.classList.toggle("is-chrome", showChrome);
+      panel.classList.toggle("is-visible", showList);
+      panel.setAttribute("aria-hidden", showChrome ? "false" : "true");
+      syncMixDockCollapse();
+    }
+
+    function updateDraftSortChips() {
+      const draft = activeDraft();
+      const mode = draft?.sortMode || "energy";
+      document.querySelectorAll("#draft-sort-row .chip[data-draft-sort]").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.draftSort === mode);
+      });
+    }
+
+    function updateDraftPlayerButtons() {
+      const addBtn = document.getElementById("draft-add-btn");
+      const removeBtn = document.getElementById("draft-remove-btn");
+      const inDraft = state.selectedId && draftTrackIdSet().has(state.selectedId);
+      if (addBtn) {
+        addBtn.disabled = !state.selectedId;
+        addBtn.hidden = !!inDraft;
+      }
+      if (removeBtn) {
+        removeBtn.hidden = !inDraft;
+      }
+    }
+
+    function renderDraftRamp(tracks) {
+      const el = document.getElementById("draft-ramp");
+      if (!el) return;
+      if (!tracks.length) {
+        el.hidden = true;
+        el.setAttribute("aria-hidden", "true");
+        el.innerHTML = "";
+        return;
+      }
+      const { path, points } = TD.energyRampPoints(tracks, 220, 36);
+      el.hidden = false;
+      el.setAttribute("aria-hidden", "false");
+      el.innerHTML = `<svg viewBox="0 0 220 36" preserveAspectRatio="none" aria-hidden="true"><path class="draft-ramp-line" d="${SetaRenderSafe.attr(path)}"></path>${points.map(p => `<circle class="draft-ramp-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2"></circle>`).join("")}</svg>`;
+    }
+
+    function draftTrackMetaHtml(track) {
+      const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
+      const keyText = SetaRenderSafe.html(track.key || "?");
+      const keyColor = camelotColor(track.key);
+      const energyVal = track.energy != null ? track.energy.toFixed(2) : "?";
+      const statsRow = `<span class="neighbor-meta-row neighbor-meta-row-stats">
+        <span class="tt-badge energy neighbor-badge" title="Intensity">${energyVal}</span>
+        <span class="tt-badge bpm neighbor-badge">${bpmVal}</span>
+        <span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
+      </span>`;
+      return `<span class="neighbor-meta neighbor-meta--anchor">${statsRow}</span>`;
+    }
+
+    function draftListItemHtml(track, index, { playing = false, isFinal = false, note = "" } = {}) {
+      const title = SetaRenderSafe.html(track.title || "Unknown title");
+      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
+      const trackId = SetaRenderSafe.attr(track.id);
+      const classes = [
+        "draft-item",
+        playing ? "is-playing" : "",
+        state.selectedId === track.id ? "is-active" : "",
+        isFinal ? "is-final" : "",
+      ].filter(Boolean).join(" ");
+      return `<li>
+        <div class="${classes}" data-track-id="${trackId}" data-draft-index="${index}">
+          <button type="button" class="draft-star" data-draft-star="${trackId}" title="Mark final cut" aria-label="Toggle final cut">${isFinal ? "★" : "☆"}</button>
+          <button type="button" class="neighbor-item draft-row" data-track-id="${trackId}" role="option">
+            <span class="neighbor-main">
+              <span class="neighbor-title">${title}</span>
+              <span class="neighbor-artist">${artist}</span>
+            </span>
+            ${draftTrackMetaHtml(track)}
+          </button>
+          <button type="button" class="draft-remove" data-draft-remove="${trackId}" title="Remove from draft" aria-label="Remove from draft">×</button>
+          <input type="text" class="draft-note-input" data-draft-note="${trackId}" placeholder="Note…" value="${SetaRenderSafe.attr(note)}" aria-label="Track note" />
+        </div>
+      </li>`;
+    }
+
+    function updateDraftUi() {
+      const draft = activeDraft();
+      const listEl = document.getElementById("draft-list");
+      const emptyEl = document.getElementById("draft-empty");
+      const countEl = document.getElementById("draft-count");
+      const tabCountEl = document.getElementById("draft-tab-count");
+      const nameInput = document.getElementById("draft-name-input");
+      if (!listEl || !emptyEl) return;
+
+      const byId = tracksByIdMap();
+      const tracks = draft ? TD.resolveDraftTracks(draft, byId) : [];
+      const count = draft?.trackIds.length || 0;
+      const target = draft?.targetCount || TD.DRAFT_TARGET_DEFAULT;
+      const finals = draftFinalIdSet();
+
+      if (nameInput && draft && nameInput !== document.activeElement) {
+        nameInput.value = draft.name || "Set draft";
+      }
+      if (countEl) countEl.textContent = `${count} / ${target}${finals.size ? ` · ${finals.size} final` : ""}`;
+      if (tabCountEl) tabCountEl.textContent = count ? ` ${count}/${target}` : "";
+
+      updateDraftSortChips();
+      renderDraftRamp(tracks);
+      updateDraftPlayerButtons();
+
+      if (!count) {
+        listEl.innerHTML = "";
+        emptyEl.hidden = false;
+      } else {
+        emptyEl.hidden = true;
+        listEl.innerHTML = tracks.map((track, index) => draftListItemHtml(track, index, {
+          playing: state.playingId === track.id,
+          isFinal: finals.has(track.id),
+          note: draft.notes?.[track.id] || "",
+        })).join("");
+        syncEllipsisTooltips(listEl);
+      }
+
+      updateMixDockChrome();
+    }
+
+    function exportDraftM3uDownload() {
+      const draft = activeDraft();
+      if (!draft?.trackIds.length) return;
+      const blob = new Blob([TD.exportDraftM3u(draft, tracksByIdMap())], { type: "audio/x-mpegurl;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(draft.name || "set-draft").replace(/[^\w\-]+/g, "-").toLowerCase()}.m3u`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copyDraftTextList() {
+      const draft = activeDraft();
+      if (!draft?.trackIds.length) return;
+      const text = TD.exportDraftText(draft, tracksByIdMap());
+      try {
+        await navigator.clipboard.writeText(text);
+        setPlayerIdle("Draft list copied");
+      } catch (_) {
+        setPlayerIdle("Could not copy draft list");
+      }
+    }
+
+    function playDraftFromStart() {
+      const draft = activeDraft();
+      if (!draft?.trackIds.length) return;
+      state.draftPlayThrough = true;
+      setMixDockTab("draft");
+      syncPlayQueue();
+      if (!state.playQueue.length) return;
+      playTrackAt(0, true);
     }
 
     function syncPlayQueue() {
@@ -3329,7 +3975,9 @@
 
     function filteredTracks() {
       const q = state.search.trim().toLowerCase();
+      const draftIds = draftTrackIdSet();
       return state.data.tracks.filter(t => {
+        if (state.draftOnlyFilter && !draftIds.has(t.id)) return false;
         if (!state.sources.has(t.source)) return false;
         if (state.genre !== "all" && t.genre !== state.genre && t.batch !== state.genre) return false;
         if (t.bpm != null && (t.bpm < state.bpmMin || t.bpm > state.bpmMax)) return false;
@@ -3494,52 +4142,36 @@
     }
 
     function syncNeighborPanelCollapse() {
-      const panel = document.getElementById("neighbor-panel");
-      const toggle = document.getElementById("neighbor-panel-toggle");
-      if (!panel || !toggle) return;
-      const collapsed = state.neighborQueueCollapsed && panel.classList.contains("is-visible");
-      panel.classList.toggle("is-collapsed", collapsed);
-      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      syncMixDockCollapse();
     }
 
     function updateNeighborList(tracks) {
-      const panel = document.getElementById("neighbor-panel");
+      const panel = document.getElementById("mix-dock");
       const list = document.getElementById("neighbor-list");
-      const countEl = document.getElementById("neighbor-panel-count");
       const emptyEl = document.getElementById("neighbor-empty");
-      if (!panel || !list || !countEl || !emptyEl) return;
+      if (!panel || !list || !emptyEl) return;
 
       const anchorId = neighborAnchorId();
-      const showChrome = !!state.selectedId;
-      const showList = state.highlightNeighbors && !!anchorId;
-      panel.classList.toggle("is-chrome", showChrome);
-      panel.classList.toggle("is-visible", showList);
-      panel.setAttribute("aria-hidden", showChrome ? "false" : "true");
+      const showList = state.mixDockTab === "neighbors" && state.highlightNeighbors && !!anchorId;
       if (!showList) {
         list.innerHTML = "";
         emptyEl.hidden = true;
-        countEl.textContent = "";
         state.queueFocusIndex = -1;
-        syncNeighborPanelCollapse();
+        updateMixDockChrome();
+        updateDraftUi();
         return;
       }
 
       const anchor = tracks.find(t => t.id === anchorId)
         || state.data?.tracks.find(t => t.id === anchorId);
       if (!anchor) {
-        panel.classList.remove("is-visible");
-        panel.classList.toggle("is-chrome", !!state.selectedId);
-        panel.setAttribute("aria-hidden", state.selectedId ? "false" : "true");
         list.innerHTML = "";
-        countEl.textContent = "";
-        syncNeighborPanelCollapse();
+        updateMixDockChrome();
+        updateDraftUi();
         return;
       }
 
       const { list: neighbors } = mixNeighbors(anchorId, tracks);
-      countEl.textContent = neighbors.length
-        ? `${neighbors.length} mixable`
-        : "Anchor only";
 
       if (!neighbors.length) {
         list.innerHTML = neighborListItemHtml(anchor, {
@@ -3566,6 +4198,8 @@
       syncNeighborPanelCollapse();
       syncEllipsisTooltips(list);
       initQueueFocusFromPlaying();
+      updateMixDockChrome();
+      updateDraftUi();
     }
 
     function viewFilterSignature() {
@@ -3577,6 +4211,7 @@
         bpmMax: state.bpmMax,
         search: state.search.trim().toLowerCase(),
         sources: [...state.sources].sort(),
+        draftOnly: state.draftOnlyFilter,
       });
     }
 
@@ -3589,7 +4224,8 @@
         || state.search.trim() !== ""
         || state.bpmMin > lo
         || state.bpmMax < hi
-        || state.sources.size < 2;
+        || state.sources.size < 2
+        || state.draftOnlyFilter;
     }
 
     function mixMapFitTransform(tracks, plotLeft, plotWidth, plotHeight) {
@@ -3701,9 +4337,13 @@
       const both = state.sources.has("tracks") && state.sources.has("to_curate");
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
         const src = chip.dataset.source;
+        if (src === "draft-only") {
+          chip.classList.toggle("active", state.draftOnlyFilter);
+          return;
+        }
         const active = src === "all"
-          ? both
-          : state.sources.size === 1 && state.sources.has(src);
+          ? both && !state.draftOnlyFilter
+          : state.sources.size === 1 && state.sources.has(src) && !state.draftOnlyFilter;
         chip.classList.toggle("active", active);
       });
     }
@@ -3948,6 +4588,8 @@
       updatePlayButton();
       updateSeekUi();
       state.refreshHighlight?.();
+      updateDraftPlayerButtons();
+      updateDraftUi();
     }
 
     function setNowPlaying(track, autoplay = true) {
@@ -3999,14 +4641,23 @@
     }
 
     function canQueueKeyboardNav() {
-      const panel = document.getElementById("neighbor-panel");
-      return state.highlightNeighbors
-        && !!neighborAnchorId()
-        && panel?.classList.contains("is-visible");
+      const panel = document.getElementById("mix-dock");
+      if (!panel?.classList.contains("is-visible")) return false;
+      if (state.mixDockTab === "draft") {
+        return (activeDraft()?.trackIds.length || 0) > 0;
+      }
+      return state.highlightNeighbors && !!neighborAnchorId();
+    }
+
+    function activeQueueItems() {
+      if (state.mixDockTab === "draft") {
+        return [...document.querySelectorAll("#draft-list .draft-row[data-track-id]")];
+      }
+      return [...document.querySelectorAll("#neighbor-list .neighbor-item[data-track-id]")];
     }
 
     function neighborQueueItems() {
-      return [...document.querySelectorAll("#neighbor-list .neighbor-item[data-track-id]")];
+      return activeQueueItems();
     }
 
     function syncQueueFocusHighlight() {
@@ -4057,6 +4708,11 @@
 
     function clearViewFilters() {
       let changed = false;
+      if (state.draftOnlyFilter) {
+        state.draftOnlyFilter = false;
+        document.getElementById("draft-only-chip")?.classList.remove("active");
+        changed = true;
+      }
       if (state.activeMoments.size) {
         state.activeMoments.clear();
         changed = true;
@@ -4081,7 +4737,9 @@
 
     function enableNeighborsMode() {
       state.highlightNeighbors = true;
+      state.draftPlayThrough = false;
       state.neighborQueueAnchor = state.selectedId;
+      setMixDockTab("neighbors");
       syncPlayQueue();
       focusNeighborGroup(state.selectedId);
       renderGraph();
@@ -4208,6 +4866,26 @@
       if ((event.key === "n" || event.key === "N") && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
         toggleNeighborsMode();
+        return;
+      }
+
+      if ((event.key === "a" || event.key === "A") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        addSelectedToDraft();
+        return;
+      }
+
+      if (event.key === "Backspace" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (state.selectedId && draftTrackIdSet().has(state.selectedId)) {
+          event.preventDefault();
+          removeTrackFromActiveDraft(state.selectedId);
+        }
+        return;
+      }
+
+      if ((event.key === "d" || event.key === "D") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        setMixDockTab("draft");
         return;
       }
 
@@ -4550,10 +5228,14 @@
       function refreshHighlight() {
         const active = neighborAnchorId();
         const neighbors = active && state.highlightNeighbors ? neighborIds(active) : null;
+        const draftIds = draftTrackIdSet();
+        const finalIds = draftFinalIdSet();
         node.classed("selected", d => d.id === active);
         node.classed("playing", d => d.id === state.playingId);
         node.classed("neighbor", d => neighbors && neighbors.has(d.id) && d.id !== active);
         node.classed("dim", d => neighbors && !neighbors.has(d.id));
+        node.classed("in-draft", d => draftIds.has(d.id));
+        node.classed("in-draft-final", d => finalIds.has(d.id));
         node.classed("obscured", d => isNodeObscured(d));
         if (link) {
           link.style("opacity", state.highlightNeighbors ? 0 : 1);
@@ -4794,6 +5476,8 @@
       syncUiLayout();
       updateCamelotLegend();
       bindGraphInteraction();
+      state.draftStore = TD.loadDraftStore(localStorage);
+      if (!activeDraft()) ensureDraft("Set draft");
       const res = await fetch("/api/library");
       state.data = await res.json();
       state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
@@ -4802,6 +5486,7 @@
       syncMixLinksAvailability();
       syncUiLayout();
       renderGraph();
+      updateDraftUi();
 
       document.getElementById("search").addEventListener("input", e => {
         state.search = e.target.value;
@@ -4851,6 +5536,13 @@
       document.querySelectorAll("#source-filters .chip").forEach(chip => {
         chip.addEventListener("click", () => {
           const src = chip.dataset.source;
+          if (src === "draft-only") {
+            state.draftOnlyFilter = !state.draftOnlyFilter;
+            syncSourceFilterChips();
+            renderGraph();
+            return;
+          }
+          state.draftOnlyFilter = false;
           state.sources = src === "all"
             ? new Set(["tracks", "to_curate"])
             : new Set([src]);
@@ -4943,12 +5635,12 @@
           if (state.data) renderGraph();
         }).observe(filterBar);
       }
-      const neighborPanel = document.getElementById("neighbor-panel");
-      if (neighborPanel) {
+      const mixDock = document.getElementById("mix-dock");
+      if (mixDock) {
         new ResizeObserver(() => {
           syncUiLayout();
           if (state.data) renderGraph();
-        }).observe(neighborPanel);
+        }).observe(mixDock);
       }
       syncUiLayout();
       audio.addEventListener("timeupdate", updateSeekUi);
@@ -4959,6 +5651,9 @@
 
       document.getElementById("neighbors-btn").addEventListener("click", toggleNeighborsMode);
 
+      document.getElementById("mix-tab-neighbors").addEventListener("click", () => setMixDockTab("neighbors"));
+      document.getElementById("mix-tab-draft").addEventListener("click", () => setMixDockTab("draft"));
+
       document.getElementById("neighbor-list").addEventListener("click", (event) => {
         const btn = event.target.closest(".neighbor-item");
         if (!btn?.dataset.trackId || !state.data) return;
@@ -4966,10 +5661,76 @@
         if (track) setNowPlaying(track);
       });
 
-      document.getElementById("neighbor-panel-toggle").addEventListener("click", () => {
-        if (!state.highlightNeighbors) return;
-        state.neighborQueueCollapsed = !state.neighborQueueCollapsed;
-        syncNeighborPanelCollapse();
+      document.getElementById("draft-list").addEventListener("click", (event) => {
+        const removeBtn = event.target.closest("[data-draft-remove]");
+        if (removeBtn?.dataset.draftRemove) {
+          event.stopPropagation();
+          removeTrackFromActiveDraft(removeBtn.dataset.draftRemove);
+          return;
+        }
+        const starBtn = event.target.closest("[data-draft-star]");
+        if (starBtn?.dataset.draftStar) {
+          event.stopPropagation();
+          const draft = activeDraft();
+          if (draft) {
+            TD.toggleFinalInDraft(draft, starBtn.dataset.draftStar);
+            persistDraftState();
+            updateDraftUi();
+            state.refreshHighlight?.();
+          }
+          return;
+        }
+        const btn = event.target.closest(".draft-row");
+        if (!btn?.dataset.trackId || !state.data) return;
+        const track = state.data.tracks.find(t => t.id === btn.dataset.trackId);
+        if (track) {
+          state.draftPlayThrough = true;
+          setNowPlaying(track);
+        }
+      });
+
+      document.getElementById("draft-list").addEventListener("input", (event) => {
+        const input = event.target.closest("[data-draft-note]");
+        if (!input?.dataset.draftNote) return;
+        const draft = activeDraft();
+        if (!draft) return;
+        TD.setDraftNote(draft, input.dataset.draftNote, input.value);
+        persistDraftState();
+      });
+
+      document.getElementById("draft-name-input").addEventListener("change", (event) => {
+        const draft = activeDraft();
+        if (!draft) return;
+        draft.name = event.target.value.trim() || "Set draft";
+        persistDraftState();
+        updateDraftUi();
+      });
+
+      document.querySelectorAll("#draft-sort-row .chip[data-draft-sort]").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const draft = activeDraft();
+          if (!draft) return;
+          TD.setDraftSortMode(draft, chip.dataset.draftSort);
+          persistDraftState();
+          syncPlayQueue();
+          updateDraftUi();
+          renderGraph();
+        });
+      });
+
+      document.getElementById("draft-play-btn").addEventListener("click", playDraftFromStart);
+      document.getElementById("draft-export-m3u-btn").addEventListener("click", exportDraftM3uDownload);
+      document.getElementById("draft-copy-btn").addEventListener("click", copyDraftTextList);
+      document.getElementById("draft-add-btn").addEventListener("click", addSelectedToDraft);
+      document.getElementById("draft-remove-btn").addEventListener("click", () => {
+        if (state.selectedId) removeTrackFromActiveDraft(state.selectedId);
+      });
+
+      document.getElementById("mix-panel-toggle").addEventListener("click", () => {
+        const panel = document.getElementById("mix-dock");
+        if (!panel?.classList.contains("is-visible")) return;
+        state.mixDockCollapsed = !state.mixDockCollapsed;
+        syncMixDockCollapse();
         renderGraph();
       });
 
