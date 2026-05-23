@@ -2515,7 +2515,7 @@
           { keys: "n", desc: "Toggle neighbor mode on map (opens sidebar when on)" },
           { keys: "↑ ↓", desc: "Move in queue when sidebar is open" },
           { keys: "Enter", desc: "Play highlighted queue track" },
-          { keys: "⌘ Enter", desc: "Set focused neighbor as anchor (0) and play" },
+          { keys: "⌘ Enter", desc: "Set focused or selected track as neighbor anchor (0) and play" },
         ],
       },
       {
@@ -4541,10 +4541,7 @@
     }
 
     function neighborAnchorId() {
-      if (state.highlightNeighbors && state.neighborQueueAnchor) {
-        return state.neighborQueueAnchor;
-      }
-      return state.selectedId;
+      return state.neighborQueueAnchor || state.selectedId;
     }
 
     function neighborIds(trackId) {
@@ -5228,13 +5225,14 @@
     }
 
     function reanchorNeighborQueue(trackId) {
-      if (!state.highlightNeighbors || !trackId || !state.data) return false;
+      if (!trackId || !state.data) return false;
       const track = state.data.tracks.find(t => t.id === trackId);
       if (!track) return false;
       state.neighborQueueAnchor = trackId;
       state.selectedId = trackId;
       state.draftPlayThrough = false;
-      focusNeighborGroup(trackId);
+      if (!isNeighborsPanelOpen()) showNeighborsPanel();
+      if (state.highlightNeighbors) focusNeighborGroup(trackId);
       renderGraph();
       setNowPlaying(track, true);
       state.queueFocusIndex = 0;
@@ -5242,13 +5240,14 @@
       return true;
     }
 
-    function reanchorQueueFocus() {
-      if (!state.highlightNeighbors || !canQueueKeyboardNav()) return;
-      const items = neighborQueueItems();
-      if (!items.length) return;
-      const idx = state.queueFocusIndex >= 0 ? state.queueFocusIndex : 0;
-      const trackId = items[idx]?.dataset.trackId;
-      if (trackId) reanchorNeighborQueue(trackId);
+    function reanchorFromShortcut() {
+      if (state.mixDockTab === "draft") return false;
+      if (isNeighborsPanelOpen()) {
+        const trackId = queueFocusTrackId();
+        if (trackId) return reanchorNeighborQueue(trackId);
+      }
+      if (state.selectedId) return reanchorNeighborQueue(state.selectedId);
+      return false;
     }
 
     function seekBySeconds(delta) {
@@ -5307,7 +5306,6 @@
         clearTimeout(state.neighborFocusTimer);
         state.neighborFocusTimer = null;
       }
-      state.neighborQueueAnchor = null;
       state.queueFocusIndex = -1;
       syncPlayQueue();
       updateMixDockChrome();
@@ -5528,9 +5526,9 @@
         return;
       }
 
-      if (canQueueKeyboardNav() && event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        reanchorQueueFocus();
+        reanchorFromShortcut();
         return;
       }
 
