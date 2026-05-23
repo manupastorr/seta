@@ -2019,18 +2019,13 @@
     .draft-item .draft-row .neighbor-meta {
       width: auto;
       min-width: 0;
-      justify-content: flex-start;
+      flex-shrink: 0;
+      justify-content: center;
+      align-items: flex-end;
     }
 
-    .draft-item .draft-row .neighbor-meta-row-stats {
-      display: inline-flex;
-      flex-direction: column;
-      align-items: flex-end;
-      justify-content: flex-start;
-      gap: 2px;
-      flex-wrap: nowrap;
-      width: auto;
-      min-width: 0;
+    .draft-item .draft-row .neighbor-meta .neighbor-badge.energy {
+      font-variant-numeric: tabular-nums;
     }
 
     .draft-item .draft-row .neighbor-title {
@@ -3680,16 +3675,8 @@
     }
 
     function draftTrackMetaHtml(track) {
-      const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
-      const keyText = SetaRenderSafe.html(track.key || "?");
-      const keyColor = camelotColor(track.key);
       const energyVal = track.energy != null ? track.energy.toFixed(2) : "?";
-      const statsRow = `<span class="neighbor-meta-row neighbor-meta-row-stats">
-        <span class="tt-badge energy neighbor-badge" title="Intensity">${energyVal}</span>
-        <span class="tt-badge bpm neighbor-badge">${bpmVal}</span>
-        <span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
-      </span>`;
-      return `<span class="neighbor-meta neighbor-meta--anchor">${statsRow}</span>`;
+      return `<span class="neighbor-meta" title="Intensity"><span class="tt-badge energy neighbor-badge">${energyVal}</span></span>`;
     }
 
     function draftListItemHtml(track, index, { playing = false, isFinal = false, note = "" } = {}) {
