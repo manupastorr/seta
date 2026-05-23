@@ -52,8 +52,34 @@
     return { ids, list };
   }
 
+  function sortDraftTracks(tracks, sortMode) {
+    if (sortMode === "manual") return tracks.slice();
+    return tracks.slice().sort((a, b) => {
+      if (sortMode === "bpm") {
+        const da = a.bpm ?? Infinity;
+        const db = b.bpm ?? Infinity;
+        if (da !== db) return da - db;
+        return (a.energy ?? 0) - (b.energy ?? 0);
+      }
+      const da = a.energy ?? 0;
+      const db = b.energy ?? 0;
+      if (da !== db) return da - db;
+      return (a.bpm ?? 0) - (b.bpm ?? 0);
+    });
+  }
+
+  function buildDraftQueue(filtered, draftTrackIds, sortMode = "energy") {
+    if (!Array.isArray(draftTrackIds) || !draftTrackIds.length) return [];
+    const byId = new Map(filtered.map(t => [t.id, t]));
+    const tracks = draftTrackIds.map(id => byId.get(id)).filter(Boolean);
+    return sortDraftTracks(tracks, sortMode);
+  }
+
   function buildNavigableTracks(filtered, selection) {
     const base = filtered;
+    if (selection?.draftPlayMode && selection.draftTrackIds?.length) {
+      return buildDraftQueue(base, selection.draftTrackIds, selection.draftSortMode || "energy");
+    }
     if (selection?.highlightNeighbors && selection.neighborQueueAnchor) {
       const { list } = mixNeighbors(selection.neighborQueueAnchor, base);
       const anchor = base.find(t => t.id === selection.neighborQueueAnchor);
@@ -111,6 +137,8 @@
     MIX_MIN_SCORE,
     mixScore,
     mixNeighbors,
+    sortDraftTracks,
+    buildDraftQueue,
     buildNavigableTracks,
     queueSignature,
     resolvePlayIndex,

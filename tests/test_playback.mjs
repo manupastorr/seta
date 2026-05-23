@@ -145,3 +145,29 @@ test("queue has unique ids (no false stuck navigation)", () => {
   assert.equal(queueSignature(queue), queue.map(t => t.id).join("\0"));
   assert.equal(new Set(queue.map(t => t.id)).size, queue.length);
 });
+
+test("buildNavigableTracks uses draft queue when draft play mode is on", () => {
+  const low = track("low", "Low", "1A", 100);
+  low.energy = 0.2;
+  const high = track("high", "High", "2A", 110);
+  high.energy = 0.8;
+  const filtered = [high, low];
+  const queue = buildNavigableTracks(filtered, {
+    draftPlayMode: true,
+    draftTrackIds: [high.id, low.id],
+    draftSortMode: "energy",
+  });
+  assert.deepEqual(queue.map(t => t.id), [low.id, high.id]);
+});
+
+test("buildNavigableTracks ignores draft queue when draft play mode is off", () => {
+  const inDraft = track("in", "In draft", "1A", 100);
+  const other = track("out", "Outside", "8A", 128);
+  const filtered = [inDraft, other];
+  const queue = buildNavigableTracks(filtered, {
+    draftPlayMode: false,
+    draftTrackIds: [inDraft.id],
+    draftSortMode: "energy",
+  });
+  assert.deepEqual(queue.map(t => t.id), [inDraft.id, other.id]);
+});
