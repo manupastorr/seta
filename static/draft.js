@@ -10,7 +10,6 @@
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const DRAFT_STORAGE_KEY = "seta-drafts-v1";
-  const DRAFT_TARGET_DEFAULT = 50;
   const DRAFT_SORT_MODES = ["manual", "energy", "bpm"];
 
   function newDraftId() {
@@ -25,7 +24,6 @@
       finalIds: [],
       notes: {},
       sortMode: "energy",
-      targetCount: DRAFT_TARGET_DEFAULT,
       updatedAt: Date.now(),
     };
   }
@@ -45,7 +43,6 @@
       finalIds,
       notes,
       sortMode,
-      targetCount: Number.isFinite(raw.targetCount) ? raw.targetCount : DRAFT_TARGET_DEFAULT,
       updatedAt: Number.isFinite(raw.updatedAt) ? raw.updatedAt : Date.now(),
     };
   }
@@ -256,7 +253,6 @@
 
   return {
     DRAFT_STORAGE_KEY,
-    DRAFT_TARGET_DEFAULT,
     DRAFT_SORT_MODES,
     createDraft,
     normalizeDraft,

@@ -1306,6 +1306,7 @@
 
     .legend,
     .moments-legend {
+      --legend-panel-width: 172px;
       background: rgba(255, 255, 255, 0.75);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
@@ -1315,6 +1316,8 @@
       z-index: 4;
       pointer-events: auto;
       overflow: hidden;
+      width: var(--legend-panel-width);
+      max-width: var(--legend-panel-width);
     }
 
     .legend {
@@ -1322,23 +1325,57 @@
       right: 18px;
       bottom: calc(var(--player-height, 72px) + 10px);
       top: auto;
-      width: 196px;
-      max-width: 196px;
-      padding: 8px 10px 10px;
+      padding: 6px 7px 6px;
     }
 
     .legend-panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-      min-height: 22px;
+      gap: 6px;
+      margin-bottom: 6px;
+      min-height: 20px;
     }
 
     .legend.is-collapsed .legend-panel-header,
     .moments-legend.is-collapsed .legend-panel-header {
       margin-bottom: 0;
+    }
+
+    .legend.is-collapsed,
+    .moments-legend.is-collapsed {
+      width: max-content;
+      max-width: none;
+      max-height: none;
+      overflow: hidden;
+      padding: 5px 8px;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .legend:not(.is-collapsed) .legend-panel-header,
+    .moments-legend:not(.is-collapsed) .legend-panel-header {
+      margin-bottom: 2px;
+    }
+
+    .legend-panel-body {
+      line-height: 0;
+    }
+
+    .legend-panel-body .filter-hint {
+      line-height: 1.3;
+    }
+
+    .legend-panel-header .mix-dock-tab {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .legend-panel-header .bpm-reset {
+      flex-shrink: 0;
+      padding: 1px 5px;
+      font-size: 10px;
+      line-height: 1.2;
     }
 
     .legend-panel-toggle {
@@ -1396,11 +1433,11 @@
 
     .camelot-wheel {
       display: block;
-      width: 168px;
-      height: 168px;
-      max-width: 168px;
-      max-height: 168px;
-      margin: 0 auto;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+      max-width: 100%;
+      margin: 0;
       flex-shrink: 0;
       touch-action: auto;
     }
@@ -1591,9 +1628,7 @@
       right: 18px;
       top: calc(var(--filter-bar-height, 88px) + 10px);
       max-height: calc(100% - var(--filter-bar-height, 88px) - var(--player-height, 72px) - 270px);
-      padding: 8px 10px;
-      width: 196px;
-      max-width: 196px;
+      padding: 6px 7px 7px;
       overflow-y: auto;
     }
 
@@ -1617,7 +1652,7 @@
       letter-spacing: 0.05em;
       text-transform: uppercase;
       color: var(--muted);
-      padding: 6px 5px 2px;
+      padding: 4px 4px 1px;
     }
 
     .moment-legend-section-title:first-child {
@@ -1627,17 +1662,19 @@
     .moment-legend-item {
       display: flex;
       align-items: center;
-      gap: 4px;
-      font-size: 8px;
-      line-height: 1;
+      gap: 3px;
+      font-family: inherit;
+      font-weight: inherit;
+      font-size: 10px;
+      line-height: 1.15;
       color: var(--text);
       width: 100%;
-      padding: 1px 5px;
+      padding: 1px 4px;
+      min-height: 0;
       border: 1px solid transparent;
-      border-radius: 8px;
+      border-radius: 6px;
       background: transparent;
       cursor: pointer;
-      font: inherit;
       text-align: left;
       transition: opacity 0.15s ease, background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
     }
@@ -1662,7 +1699,7 @@
 
     .moment-cloud {
       flex-shrink: 0;
-      font-size: 10px;
+      font-size: 9px;
       line-height: 1;
       filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
     }
@@ -1781,28 +1818,36 @@
 
     .mix-dock-tabs {
       display: flex;
-      gap: 4px;
+      gap: 6px;
+      flex: 1;
+      align-items: center;
       flex-shrink: 0;
     }
 
     .mix-dock-tab {
-      border: 1px solid var(--panel-border);
-      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      background: none;
       color: var(--muted);
-      border-radius: 4px;
-      padding: 1px 5px;
+      padding: 0;
       font: inherit;
       font-size: 10px;
       line-height: 1.3;
-      font-weight: 500;
+      font-weight: inherit;
       cursor: pointer;
       white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .mix-dock-tab:hover,
+    .mix-dock-tab:focus-visible {
+      color: var(--accent);
     }
 
     .mix-dock-tab.active {
       color: var(--text);
-      border-color: rgba(107, 79, 216, 0.35);
-      background: var(--accent-soft);
+      font-weight: 500;
     }
 
     .mix-dock-tab:disabled {
@@ -1810,16 +1855,46 @@
       cursor: not-allowed;
     }
 
+    .mix-dock-tab:disabled:hover {
+      color: var(--muted);
+    }
+
+    .mix-dock-tab kbd {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.9);
+      font: 600 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text);
+    }
+
+    .mix-dock-tab.active kbd {
+      border-color: rgba(107, 79, 216, 0.35);
+      background: var(--accent-soft);
+    }
+
     .mix-dock-tab-count {
-      opacity: 0.85;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      opacity: 0.9;
+    }
+
+    .mix-dock-tab-sep {
+      opacity: 0.45;
+      font-size: 10px;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .mix-dock-tab-sep[hidden] {
+      display: none !important;
     }
 
     .mix-dock-header {
       flex-shrink: 0;
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
-      gap: 6px 8px;
       margin-bottom: 0;
     }
 
@@ -1851,18 +1926,8 @@
       display: none !important;
     }
 
-    .mix-dock.is-chrome:not(.is-visible) .mix-dock-body,
-    .mix-dock.is-chrome:not(.is-visible) .mix-panel-meta {
+    .mix-dock.is-chrome:not(.is-visible) .mix-dock-body {
       display: none;
-    }
-
-    .mix-panel-meta {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
     }
 
     .draft-toolbar {
@@ -2215,14 +2280,9 @@
       <div class="mix-dock" id="mix-dock" aria-hidden="true">
         <div class="mix-dock-header">
           <div class="mix-dock-tabs">
-            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors">Neighbors<span class="mix-dock-tab-count" id="neighbors-tab-count"></span></button>
-            <button type="button" class="mix-dock-tab" id="mix-tab-draft" data-tab="draft">Draft <span class="mix-dock-tab-count" id="draft-tab-count"></span></button>
-          </div>
-          <div class="mix-panel-meta">
-            <button type="button" class="neighbor-panel-toggle" id="mix-panel-toggle" aria-expanded="true" aria-controls="mix-dock-body">
-              <span class="neighbor-panel-chevron" aria-hidden="true"></span>
-              <span class="neighbor-panel-title" id="mix-panel-title">Mix queue</span>
-            </button>
+            <button type="button" class="mix-dock-tab active" id="mix-tab-neighbors" data-tab="neighbors" title="Toggle neighbors (n)"><kbd>n</kbd> neighbors<span class="mix-dock-tab-count" id="neighbors-tab-count"></span></button>
+            <span class="mix-dock-tab-sep" aria-hidden="true">·</span>
+            <button type="button" class="mix-dock-tab" id="mix-tab-draft" data-tab="draft" title="Toggle draft (d)"><kbd>d</kbd> draft<span class="mix-dock-tab-count" id="draft-tab-count"></span></button>
           </div>
         </div>
         <div class="mix-dock-body" id="mix-dock-body">
@@ -2311,7 +2371,7 @@
     const PB = TrackGraphPlayback;
     const TD = TrackGraphDraft;
 
-    const CAMELOT_WHEEL_SIZE = 168;
+    const CAMELOT_WHEEL_SIZE = 158;
 
     const CAMELOT_COLORS = {
       "1A": "#C62828", "1B": "#EF5350", "2A": "#E65100", "2B": "#FF9800",
@@ -2371,6 +2431,8 @@
       {
         title: "Map & filters",
         rows: [
+          { keys: "z", desc: "Toggle set zones panel" },
+          { keys: "k", desc: "Toggle Camelot keys panel" },
           { keys: "r", desc: "Reset map view" },
           { keys: "Esc", desc: "Clear filters → neighbors → reset view" },
         ],
@@ -2433,9 +2495,8 @@
       highlightNeighbors: false,
       neighborQueueAnchor: null,
       neighborQueueCollapsed: false,
-      mixDockCollapsed: false,
-      momentsLegendCollapsed: false,
-      camelotLegendCollapsed: false,
+      momentsLegendOpen: false,
+      camelotLegendOpen: false,
       layout: "mix",
       activeMoments: new Set(),
       activeKeys: new Set(),
@@ -2471,7 +2532,6 @@
       draftStore: { activeId: null, drafts: {} },
       mixDockTab: "neighbors",
       mixDockDraftOpen: false,
-      mixDockCollapsed: false,
       draftOnlyFilter: false,
       draftPlayThrough: false,
     };
@@ -2908,7 +2968,7 @@
 
     function mixDockWidth() {
       const panel = document.getElementById("mix-dock");
-      if (!panel?.classList.contains("is-chrome") || panel.classList.contains("is-collapsed")) return 0;
+      if (!panel?.classList.contains("is-chrome")) return 0;
       return Math.ceil(panel.getBoundingClientRect().width) + 10;
     }
 
@@ -3333,16 +3393,15 @@
       legend.classList.toggle("is-filtering", filterOn);
       legend.innerHTML = `
         <div class="legend-panel-header">
-          <button type="button" class="legend-panel-toggle" aria-expanded="${state.momentsLegendCollapsed ? "false" : "true"}" aria-controls="moments-legend-body">
-            <span class="legend-panel-chevron" aria-hidden="true"></span>
-            <span class="moments-legend-title filter-header-title">Set zones</span>
-          </button>
+          <button type="button" class="mix-dock-tab${state.momentsLegendOpen ? " active" : ""}" id="zones-legend-tab" title="Toggle set zones (z)"><kbd>z</kbd> zones<span class="mix-dock-tab-count" id="zones-tab-count"></span></button>
           <button type="button" class="bpm-reset moments-reset" title="Reset set zone filters" aria-label="Reset set zone filters"${filterOn ? "" : " disabled"}>↺</button>
         </div>
         <div class="legend-panel-body" id="moments-legend-body">
           ${filterOn ? `<span class="moments-legend-hint filter-hint">Showing selected zones</span>` : ""}
           <div class="moments-legend-grid"></div>
         </div>`;
+      const zonesCountEl = legend.querySelector("#zones-tab-count");
+      if (zonesCountEl) zonesCountEl.textContent = filterOn ? ` ${state.activeMoments.size}` : "";
       const grid = legend.querySelector(".moments-legend-grid");
       const momentById = new Map(SET_MOMENTS.map(m => [m.id, m]));
       SET_MOMENT_SECTIONS.forEach(section => {
@@ -3379,20 +3438,28 @@
       renderGraph();
     }
 
+    function toggleMomentsLegend() {
+      state.momentsLegendOpen = !state.momentsLegendOpen;
+      syncMomentsLegendCollapse();
+    }
+
+    function toggleCamelotLegend() {
+      state.camelotLegendOpen = !state.camelotLegendOpen;
+      syncCamelotLegendCollapse();
+    }
+
     function syncMomentsLegendCollapse() {
       const legend = document.getElementById("moments-legend");
-      const toggle = legend?.querySelector(".legend-panel-toggle");
-      if (!legend || !toggle) return;
-      legend.classList.toggle("is-collapsed", state.momentsLegendCollapsed);
-      toggle.setAttribute("aria-expanded", state.momentsLegendCollapsed ? "false" : "true");
+      if (!legend) return;
+      legend.classList.toggle("is-collapsed", !state.momentsLegendOpen);
+      legend.querySelector("#zones-legend-tab")?.classList.toggle("active", state.momentsLegendOpen);
     }
 
     function syncCamelotLegendCollapse() {
       const legend = document.getElementById("legend");
-      const toggle = legend?.querySelector(".legend-panel-toggle");
-      if (!legend || !toggle) return;
-      legend.classList.toggle("is-collapsed", state.camelotLegendCollapsed);
-      toggle.setAttribute("aria-expanded", state.camelotLegendCollapsed ? "false" : "true");
+      if (!legend) return;
+      legend.classList.toggle("is-collapsed", !state.camelotLegendOpen);
+      legend.querySelector("#keys-legend-tab")?.classList.toggle("active", state.camelotLegendOpen);
     }
 
     function drawGrid(container, x, y, plotWidth, plotHeight) {
@@ -3675,7 +3742,6 @@
     function setMixDockTab(tab) {
       if (tab !== "neighbors" && tab !== "draft") return;
       state.mixDockTab = tab;
-      state.mixDockCollapsed = false;
       if (tab === "draft") state.mixDockDraftOpen = true;
 
       if (tab === "neighbors") {
@@ -3693,8 +3759,6 @@
       document.getElementById("mix-tab-draft")?.classList.toggle("active", tab === "draft");
       document.getElementById("neighbors-pane")?.toggleAttribute("hidden", tab !== "neighbors");
       document.getElementById("draft-pane")?.toggleAttribute("hidden", tab !== "draft");
-      const title = document.getElementById("mix-panel-title");
-      if (title) title.textContent = tab === "draft" ? "Set draft" : "Mix queue";
       syncPlayQueue();
       updateMixDockChrome();
       updateDraftUi();
@@ -3703,15 +3767,6 @@
         focusNeighborGroup(state.neighborQueueAnchor);
       }
       renderGraph();
-    }
-
-    function syncMixDockCollapse() {
-      const panel = document.getElementById("mix-dock");
-      const toggle = document.getElementById("mix-panel-toggle");
-      if (!panel || !toggle) return;
-      const collapsed = state.mixDockCollapsed && panel.classList.contains("is-visible");
-      panel.classList.toggle("is-collapsed", collapsed);
-      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
 
     function updateMixDockChrome() {
@@ -3733,12 +3788,13 @@
       panel.setAttribute("aria-hidden", showChrome ? "false" : "true");
 
       const neighborsTab = document.getElementById("mix-tab-neighbors");
+      const neighborsSep = document.querySelector(".mix-dock-tab-sep");
       if (neighborsTab) {
         neighborsTab.disabled = !state.selectedId;
-        neighborsTab.title = state.selectedId ? "" : "Select a track on the map first";
+        neighborsTab.hidden = !state.selectedId;
+        neighborsTab.title = state.selectedId ? "Toggle neighbors (n)" : "";
       }
-
-      syncMixDockCollapse();
+      if (neighborsSep) neighborsSep.hidden = !state.selectedId;
     }
 
     function updateDraftSortChips() {
@@ -3831,14 +3887,15 @@
       const byId = tracksByIdMap();
       const tracks = draft ? TD.resolveDraftTracks(draft, byId) : [];
       const count = draft?.trackIds.length || 0;
-      const target = draft?.targetCount || TD.DRAFT_TARGET_DEFAULT;
       const finals = draftFinalIdSet();
 
       if (nameInput && draft && nameInput !== document.activeElement) {
         nameInput.value = draft.name || "Set draft";
       }
-      if (countEl) countEl.textContent = `${count} / ${target}${finals.size ? ` · ${finals.size} final` : ""}`;
-      if (tabCountEl) tabCountEl.textContent = count ? ` ${count}/${target}` : "";
+      if (countEl) countEl.textContent = count
+        ? `${count}${finals.size ? ` · ${finals.size} final` : ""}`
+        : "";
+      if (tabCountEl) tabCountEl.textContent = count ? ` ${count}` : "";
 
       updateDraftSortChips();
       renderDraftRamp(tracks);
@@ -4310,10 +4367,6 @@
       item?.scrollIntoView({ block: "nearest" });
     }
 
-    function syncNeighborPanelCollapse() {
-      syncMixDockCollapse();
-    }
-
     function updateNeighborList(tracks) {
       const panel = document.getElementById("mix-dock");
       const list = document.getElementById("neighbor-list");
@@ -4375,7 +4428,6 @@
       }
 
       scrollNeighborItemIntoView(state.playingId || anchorId);
-      syncNeighborPanelCollapse();
       syncEllipsisTooltips(list);
       initQueueFocusFromPlaying();
       updateMixDockChrome();
@@ -5113,6 +5165,18 @@
         return;
       }
 
+      if ((event.key === "z" || event.key === "Z") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        toggleMomentsLegend();
+        return;
+      }
+
+      if ((event.key === "k" || event.key === "K") && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        toggleCamelotLegend();
+        return;
+      }
+
       if (event.code === "Space" || event.key === " ") {
         event.preventDefault();
         togglePlayPause();
@@ -5161,9 +5225,9 @@
       const size = CAMELOT_WHEEL_SIZE;
       const cx = size / 2;
       const cy = size / 2;
-      const rInner = 14;
-      const rMid = 45;
-      const rOuter = 76;
+      const rOuter = size / 2 - 3.5;
+      const rMid = rOuter * (45 / 76);
+      const rInner = rOuter * (14 / 76);
       const filterOn = state.activeKeys.size > 0;
       legend.classList.toggle("is-filtering", filterOn);
       let svg = "";
@@ -5191,10 +5255,7 @@
 
       legend.innerHTML = `
         <div class="legend-panel-header">
-          <button type="button" class="legend-panel-toggle" aria-expanded="${state.camelotLegendCollapsed ? "false" : "true"}" aria-controls="legend-body">
-            <span class="legend-panel-chevron" aria-hidden="true"></span>
-            <span class="legend-title filter-header-title">Camelot</span>
-          </button>
+          <button type="button" class="mix-dock-tab${state.camelotLegendOpen ? " active" : ""}" id="keys-legend-tab" title="Toggle Camelot keys (k)"><kbd>k</kbd> keys<span class="mix-dock-tab-count" id="keys-tab-count"></span></button>
           <button type="button" class="bpm-reset camelot-reset" title="Reset key filters" aria-label="Reset Camelot key filters"${filterOn ? "" : " disabled"}>↺</button>
         </div>
         <div class="legend-panel-body" id="legend-body">
@@ -5203,6 +5264,8 @@
             ${svg}
           </svg>
         </div>`;
+      const keysCountEl = legend.querySelector("#keys-tab-count");
+      if (keysCountEl) keysCountEl.textContent = filterOn ? ` ${state.activeKeys.size}` : "";
       syncCamelotLegendCollapse();
     }
 
@@ -5779,9 +5842,8 @@
       });
 
       document.getElementById("moments-legend").addEventListener("click", (e) => {
-        if (e.target.closest(".legend-panel-toggle")) {
-          state.momentsLegendCollapsed = !state.momentsLegendCollapsed;
-          syncMomentsLegendCollapse();
+        if (e.target.closest("#zones-legend-tab")) {
+          toggleMomentsLegend();
           return;
         }
         if (e.target.closest(".moments-reset")) {
@@ -5797,9 +5859,8 @@
       });
 
       document.getElementById("legend").addEventListener("click", (e) => {
-        if (e.target.closest(".legend-panel-toggle")) {
-          state.camelotLegendCollapsed = !state.camelotLegendCollapsed;
-          syncCamelotLegendCollapse();
+        if (e.target.closest("#keys-legend-tab")) {
+          toggleCamelotLegend();
           return;
         }
         if (e.target.closest(".camelot-reset")) {
@@ -5945,14 +6006,6 @@
       document.getElementById("draft-add-btn").addEventListener("click", addSelectedToDraft);
       document.getElementById("draft-remove-btn").addEventListener("click", () => {
         if (state.selectedId) removeTrackFromActiveDraft(state.selectedId);
-      });
-
-      document.getElementById("mix-panel-toggle").addEventListener("click", () => {
-        const panel = document.getElementById("mix-dock");
-        if (!panel?.classList.contains("is-visible")) return;
-        state.mixDockCollapsed = !state.mixDockCollapsed;
-        syncMixDockCollapse();
-        renderGraph();
       });
 
       updateNeighborsTab(null, 0);
