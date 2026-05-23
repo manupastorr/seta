@@ -46,6 +46,7 @@ After `./start.sh` has created `.venv` once:
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/test_playback.mjs
+node --test tests/test_draft.mjs
 node --test tests/test_mix_links.mjs tests/test_render_safe.mjs
 ```
 
@@ -87,8 +88,9 @@ Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.js
 ## UI conventions
 
 - Single frontend file: `static/index.html` (D3, no build step)
-- Bottom **player dock** (full-width, SoundCloud-style): transport, title/artist, badges, wide waveform; left **mix dock** holds the Neighbors toggle and mix queue (filters stay in the top bar)
-- **Keyboard shortcuts** (`?` opens help): Space play/pause, ←/→ prev/next track, Shift+←/→ seek, `/` search, `n` neighbors, `r` reset view, ↑/↓ mix queue when neighbors on, Esc peels filters/search/neighbors/view
+- Bottom **player dock** (full-width, SoundCloud-style): transport, title/artist, badges, wide waveform; left **mix dock** holds Neighbors/Draft tabs, mix queue, and set draft (add/discard, energy ramp, export); filters stay in the top bar
+- **Set draft** — local shortlist (~50 target) with add/remove (`a` / `Backspace`), final marks (★), notes, energy/BPM/manual sort, draft-only map filter, M3U + text export; persisted in `localStorage` (`seta-drafts-v1`)
+- **Keyboard shortcuts** (`?` opens help): Space play/pause, ←/→ prev/next track, Shift+←/→ seek, `/` search, `n` neighbors, `a` add to draft, `d` draft tab, `r` reset view, ↑/↓ mix queue when neighbors/draft panel open, Esc peels filters/search/neighbors/view
 - Player uses a Serato-style RGB canvas waveform (red bass / green mids / blue highs); peaks come from `library.json` when present (scan-time, 400 bars from first ~90s); otherwise one `fetch` + client decode. Playback uses the same fetch (blob URL), cached in memory (24 tracks)
 - `./start.sh --quick` runs `scan_library.py --skip-edges` for faster rescans when only adding tracks
 - **Mix map** — BPM/energy placement; **Explore** — same BPM/energy grid with link forces and draggable nodes

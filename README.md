@@ -104,6 +104,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 
 - **Mix map** — tracks placed by BPM (x) and energy (y); soft clustering when many share the same values
 - **Explore** — force graph by mix links; BPM/energy grid + set-moment clouds stay as background reference
+- **Set draft** — shortlist tracks for a set (~50 target): add/remove, final marks, notes, energy ramp, draft-only filter, M3U/text export (persisted in browser `localStorage`)
 
 ### Generated files (gitignored)
 
