@@ -12,19 +12,12 @@ async function serverAvailable() {
   }
 }
 
-async function assetHostAvailable() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+async function localAssetsAvailable() {
   try {
-    const res = await fetch("https://cdn.jsdelivr.net/npm/d3@7", {
-      method: "HEAD",
-      signal: controller.signal,
-    });
+    const res = await fetch(`${BASE_URL}/static/vendor/d3.min.js`, { method: "HEAD" });
     return res.ok;
   } catch (_) {
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -37,8 +30,8 @@ test("browser smoke: map, filters, and empty mix-link state", async (t) => {
     t.skip(`Seta server is not running at ${BASE_URL}`);
     return;
   }
-  if (!(await assetHostAvailable())) {
-    t.skip("D3 CDN is not reachable; browser smoke requires page assets");
+  if (!(await localAssetsAvailable())) {
+    t.skip("Bundled D3 asset is not reachable from the local server");
     return;
   }
 
@@ -112,8 +105,8 @@ test("browser smoke: set draft add, persist, export, and draft-only filter", asy
     t.skip(`Seta server is not running at ${BASE_URL}`);
     return;
   }
-  if (!(await assetHostAvailable())) {
-    t.skip("D3 CDN is not reachable; browser smoke requires page assets");
+  if (!(await localAssetsAvailable())) {
+    t.skip("Bundled D3 asset is not reachable from the local server");
     return;
   }
 
