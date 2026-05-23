@@ -1935,14 +1935,19 @@
     .draft-list {
       list-style: none;
       margin: 0;
-      padding: 0;
-      overflow: auto;
+      padding: 2px 0 6px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scroll-padding-block: 4px;
       flex: 1;
       min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
     .draft-list > li {
-      margin-bottom: 4px;
+      margin: 0;
     }
 
     .draft-list > li.is-dragging {
@@ -1957,11 +1962,11 @@
       width: 100%;
       display: grid;
       grid-template-columns: auto auto 1fr auto;
-      gap: 6px;
-      align-items: start;
-      border: 1px solid transparent;
-      border-radius: 10px;
-      padding: 6px;
+      gap: 4px 5px;
+      align-items: center;
+      border: 1px solid rgba(226, 226, 234, 0.9);
+      border-radius: 8px;
+      padding: 6px 4px;
       background: rgba(255, 255, 255, 0.55);
       text-align: left;
       font: inherit;
@@ -1970,14 +1975,21 @@
     }
 
     .draft-item:hover {
-      border-color: rgba(107, 79, 216, 0.18);
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(107, 79, 216, 0.22);
     }
 
     .draft-item.is-active,
     .draft-item.is-playing {
-      border-color: rgba(107, 79, 216, 0.35);
       background: var(--accent-soft);
+      border-color: rgba(107, 79, 216, 0.42);
+      box-shadow: inset 2px 0 0 var(--accent);
+    }
+
+    .draft-item.is-active:hover,
+    .draft-item.is-playing:hover {
+      background: rgba(107, 79, 216, 0.17);
+      border-color: rgba(107, 79, 216, 0.5);
     }
 
     .draft-item.is-final .draft-star {
@@ -1988,16 +2000,15 @@
       min-width: 0;
       width: 100%;
       text-align: left;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 6px;
-      padding: 2px 0;
+      grid-template-columns: minmax(0, 1fr) 46px;
+      gap: 4px 5px;
+      padding: 0;
       border: none;
       background: transparent;
       box-shadow: none;
-      align-items: start;
+      align-items: center;
     }
 
-    .draft-item .draft-row:hover,
     .draft-item .draft-row.is-active,
     .draft-item .draft-row.is-active:hover {
       background: transparent;
@@ -2005,25 +2016,8 @@
       box-shadow: none;
     }
 
-    .draft-item .draft-row .neighbor-meta {
-      width: auto;
-      min-width: 0;
-      flex-shrink: 0;
-      justify-content: center;
-      align-items: flex-end;
-    }
-
-    .draft-item .draft-row .neighbor-meta .neighbor-badge.energy {
-      font-variant-numeric: tabular-nums;
-    }
-
     .draft-item .draft-row .neighbor-title {
       line-height: 14px;
-    }
-
-    .draft-item .draft-track-meta {
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
     }
 
     .draft-drag-handle {
@@ -2122,6 +2116,71 @@
 
     .mix-dock.is-chrome:not(.is-visible) .mix-dock-tabs {
       margin-bottom: 0;
+    }
+
+    .mix-dock-cue {
+      position: absolute;
+      left: 10px;
+      top: calc(var(--filter-bar-height, 88px) + 10px);
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .mix-dock-cue[hidden] {
+      display: none !important;
+    }
+
+    .mix-dock-cue-btn {
+      border: none;
+      background: none;
+      padding: 0;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .mix-dock-cue-btn:hover,
+    .mix-dock-cue-btn:focus-visible {
+      color: var(--accent);
+    }
+
+    .mix-dock-cue-btn[hidden],
+    .mix-dock-cue-sep[hidden] {
+      display: none !important;
+    }
+
+    .mix-dock-cue-btn kbd {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid var(--panel-border);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.9);
+      font: 600 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--text);
+    }
+
+    .mix-dock-cue-sep {
+      opacity: 0.45;
+      user-select: none;
+    }
+
+    .mix-dock-cue-count {
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
     }
 
     .player-draft-actions {
@@ -2250,6 +2309,12 @@
         </div>
       </div>
 
+      <div class="mix-dock-cue" id="mix-dock-cue" hidden aria-label="Open mix dock">
+        <button type="button" class="mix-dock-cue-btn" id="mix-dock-cue-neighbors" data-mix-cue="neighbors" title="Toggle neighbors (n)"><kbd>n</kbd> neighbors</button>
+        <span class="mix-dock-cue-sep" id="mix-dock-cue-sep" aria-hidden="true">·</span>
+        <button type="button" class="mix-dock-cue-btn" id="mix-dock-cue-draft" data-mix-cue="draft" title="Open draft (d)"><kbd>d</kbd> draft<span class="mix-dock-cue-count" id="mix-dock-cue-draft-count"></span></button>
+      </div>
+
       <main id="main">
       <div class="moments-legend" id="moments-legend"></div>
       <div class="legend" id="legend"></div>
@@ -2359,7 +2424,7 @@
         rows: [
           { keys: "a", desc: "Add selected track to draft" },
           { keys: "Backspace", desc: "Remove selected track from draft" },
-          { keys: "d", desc: "Open draft tab" },
+          { keys: "d", desc: "Toggle draft panel" },
           { keys: "f", desc: "Toggle final mark on selected draft track" },
           { keys: "p", desc: "Play draft from start" },
           { keys: "e", desc: "Sort draft by energy" },
@@ -2468,6 +2533,7 @@
       energyDisplayDomain: null,
       draftStore: { activeId: null, drafts: {} },
       mixDockTab: "neighbors",
+      mixDockDraftOpen: false,
       mixDockCollapsed: false,
       draftOnlyFilter: false,
       draftPlayThrough: false,
@@ -3646,10 +3712,34 @@
       renderGraph();
     }
 
+    function isDraftPanelOpen() {
+      return state.mixDockTab === "draft" && state.mixDockDraftOpen;
+    }
+
+    function closeDraftPanel() {
+      state.mixDockDraftOpen = false;
+      state.draftPlayThrough = false;
+      syncPlayQueue();
+      updateMixDockChrome();
+      updateDraftUi();
+      renderGraph();
+    }
+
+    function openDraftPanel() {
+      state.mixDockDraftOpen = true;
+      setMixDockTab("draft");
+    }
+
+    function toggleDraftPanel() {
+      if (isDraftPanelOpen()) closeDraftPanel();
+      else openDraftPanel();
+    }
+
     function setMixDockTab(tab) {
       if (tab !== "neighbors" && tab !== "draft") return;
       state.mixDockTab = tab;
       state.mixDockCollapsed = false;
+      if (tab === "draft") state.mixDockDraftOpen = true;
 
       if (tab === "neighbors") {
         state.draftPlayThrough = false;
@@ -3694,14 +3784,28 @@
       if (!panel) return;
       const draft = activeDraft();
       const draftCount = draft?.trackIds.length || 0;
-      const showChrome = !!state.selectedId || draftCount > 0 || state.mixDockTab === "draft";
-      const showList = showChrome && (
-        state.mixDockTab === "draft"
-        || (state.mixDockTab === "neighbors" && (!!state.selectedId || draftCount > 0))
-      );
+      const onDraftTab = state.mixDockTab === "draft";
+      const draftActive = onDraftTab && state.mixDockDraftOpen;
+      const neighborsActive = state.mixDockTab === "neighbors"
+        && state.highlightNeighbors
+        && (!!state.neighborQueueAnchor || !!state.selectedId || draftCount > 0);
+      const showChrome = draftActive || neighborsActive;
+      const showList = showChrome && (draftActive || neighborsActive);
       panel.classList.toggle("is-chrome", showChrome);
       panel.classList.toggle("is-visible", showList);
       panel.setAttribute("aria-hidden", showChrome ? "false" : "true");
+
+      const cue = document.getElementById("mix-dock-cue");
+      const cueCount = document.getElementById("mix-dock-cue-draft-count");
+      const cueNeighbors = document.getElementById("mix-dock-cue-neighbors");
+      const cueSep = document.getElementById("mix-dock-cue-sep");
+      const hasSelection = !!state.selectedId;
+      const showCue = !showChrome && (hasSelection || draftCount > 0);
+      if (cue) cue.hidden = !showCue;
+      if (cueNeighbors) cueNeighbors.hidden = !hasSelection;
+      if (cueSep) cueSep.hidden = !hasSelection;
+      if (cueCount) cueCount.textContent = draftCount > 0 ? ` ${draftCount}` : "";
+
       syncMixDockCollapse();
     }
 
@@ -3742,21 +3846,23 @@
     }
 
     function draftTrackMetaHtml(track) {
+      const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
+      const keyText = SetaRenderSafe.html(track.key || "?");
+      const keyColor = camelotColor(track.key);
       const energyVal = track.energy != null ? track.energy.toFixed(2) : "?";
-      return `<span class="neighbor-meta" title="Intensity"><span class="tt-badge energy neighbor-badge">${energyVal}</span></span>`;
-    }
-
-    function draftArtistLineHtml(track) {
-      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
-      const bpm = track.bpm != null ? Math.round(track.bpm) : null;
-      const key = track.key ? SetaRenderSafe.html(track.key) : null;
-      const meta = [bpm != null ? String(bpm) : null, key].filter(Boolean).join(" · ");
-      if (!meta) return `<span class="neighbor-artist">${artist}</span>`;
-      return `<span class="neighbor-artist">${artist}<span class="draft-track-meta"> · ${meta}</span></span>`;
+      const energyRow = `<span class="neighbor-meta-row neighbor-meta-row-score">
+        <span class="tt-badge energy neighbor-badge" title="Intensity">${energyVal}</span>
+      </span>`;
+      const statsRow = `<span class="neighbor-meta-row neighbor-meta-row-stats">
+        <span class="tt-badge bpm neighbor-badge">${bpmVal}</span>
+        <span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
+      </span>`;
+      return `<span class="neighbor-meta">${energyRow}${statsRow}</span>`;
     }
 
     function draftListItemHtml(track, index, { playing = false, isFinal = false, note = "" } = {}) {
       const title = SetaRenderSafe.html(track.title || "Unknown title");
+      const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
       const trackId = SetaRenderSafe.attr(track.id);
       const classes = [
         "draft-item",
@@ -3771,7 +3877,7 @@
           <button type="button" class="neighbor-item draft-row" data-track-id="${trackId}" role="option">
             <span class="neighbor-main">
               <span class="neighbor-title">${title}</span>
-              ${draftArtistLineHtml(track)}
+              <span class="neighbor-artist">${artist}</span>
             </span>
             ${draftTrackMetaHtml(track)}
           </button>
@@ -5032,7 +5138,7 @@
 
       if ((event.key === "d" || event.key === "D") && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
-        setMixDockTab("draft");
+        toggleDraftPanel();
         return;
       }
 
@@ -5828,6 +5934,22 @@
 
       document.getElementById("mix-tab-neighbors").addEventListener("click", () => setMixDockTab("neighbors"));
       document.getElementById("mix-tab-draft").addEventListener("click", () => setMixDockTab("draft"));
+
+      document.getElementById("mix-dock-cue")?.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-mix-cue]");
+        if (!btn) return;
+        if (btn.dataset.mixCue === "neighbors") {
+          if (!state.selectedId) {
+            setPlayerIdle("Select a track on the graph first");
+            return;
+          }
+          enableNeighborsMode();
+          return;
+        }
+        if (btn.dataset.mixCue === "draft") {
+          openDraftPanel();
+        }
+      });
 
       document.getElementById("neighbor-list").addEventListener("click", (event) => {
         const btn = event.target.closest(".neighbor-item");
