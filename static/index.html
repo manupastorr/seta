@@ -4166,14 +4166,37 @@
       URL.revokeObjectURL(url);
     }
 
+    async function copyTextToClipboard(text) {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (_) {}
+      }
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.select();
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (_) {
+        ok = false;
+      }
+      area.remove();
+      return ok;
+    }
+
     async function copyDraftTextList() {
       const draft = activeDraft();
       if (!draft?.trackIds.length) return;
       const text = TD.exportDraftText(draft, tracksByIdMap());
-      try {
-        await navigator.clipboard.writeText(text);
+      if (await copyTextToClipboard(text)) {
         setPlayerIdle("Draft list copied");
-      } catch (_) {
+      } else {
         setPlayerIdle("Could not copy draft list");
       }
     }
