@@ -3724,15 +3724,15 @@
     }
 
     function playbackSelection() {
+      const draft = activeDraft();
+      if (state.draftPlayThrough && draft?.trackIds.length) {
+        return TD.buildDraftPlaybackSelection(true, draft.trackIds, draft.sortMode);
+      }
       if (state.highlightNeighbors && state.neighborQueueAnchor) {
         return {
           highlightNeighbors: true,
           neighborQueueAnchor: state.neighborQueueAnchor,
         };
-      }
-      const draft = activeDraft();
-      if (state.draftPlayThrough && draft?.trackIds.length) {
-        return TD.buildDraftPlaybackSelection(true, draft.trackIds, draft.sortMode);
       }
       return {
         highlightNeighbors: false,
@@ -3973,7 +3973,6 @@
     function setMixDockTab(tab) {
       if (tab !== "neighbors" && tab !== "draft") return;
       state.mixDockTab = tab;
-      if (tab === "draft") state.draftPlayThrough = false;
       if (tab === "neighbors") state.draftPlayThrough = false;
 
       document.getElementById("mix-tab-neighbors")?.classList.toggle("active", tab === "neighbors");
@@ -4181,9 +4180,9 @@
     function playDraftFromStart() {
       const draft = activeDraft();
       if (!draft?.trackIds.length) return;
-      state.draftPlayThrough = true;
       state.mixDockDraftOpen = true;
-      setMixDockTab("draft");
+      if (state.mixDockTab !== "draft") setMixDockTab("draft");
+      state.draftPlayThrough = true;
       syncPlayQueue();
       if (!state.playQueue.length) return;
       playTrackAt(0, true);
