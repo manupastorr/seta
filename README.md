@@ -121,8 +121,7 @@ From the repo root after `./start.sh` has created `.venv` once:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
-node --test tests/test_playback.mjs
-node --test tests/test_mix_links.mjs tests/test_render_safe.mjs
+node --test tests/test_playback.mjs tests/test_draft.mjs tests/test_mix_links.mjs tests/test_render_safe.mjs
 ```
 
 Optional browser smoke test against a running local server:
