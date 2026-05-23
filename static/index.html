@@ -574,6 +574,14 @@
       min-height: 14px;
     }
 
+    .neighbor-meta-row-draft {
+      min-height: 14px;
+    }
+
+    .neighbor-meta .neighbor-badge.draft-in:not(.is-on) {
+      visibility: hidden;
+    }
+
     .neighbor-meta--anchor {
       justify-content: center;
     }
@@ -584,6 +592,25 @@
       line-height: 1.15;
       font-weight: 600;
       letter-spacing: 0;
+    }
+
+    .neighbor-item.is-in-draft {
+      border-color: rgba(245, 166, 35, 0.38);
+      background: rgba(245, 166, 35, 0.1);
+    }
+
+    .neighbor-item.is-in-draft:hover {
+      background: rgba(245, 166, 35, 0.16);
+      border-color: rgba(245, 166, 35, 0.48);
+    }
+
+    .neighbor-meta .neighbor-badge.draft-in {
+      border-color: rgba(245, 166, 35, 0.45);
+      background: rgba(245, 166, 35, 0.16);
+      color: #9a6b12;
+      font-size: 7px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
 
     .neighbor-empty {
@@ -2489,6 +2516,8 @@
           { keys: "↑ ↓", desc: "Move in queue when sidebar is open" },
           { keys: "Enter", desc: "Play highlighted queue track" },
           { keys: "⌘ Enter", desc: "Set focused neighbor as anchor (0) and play" },
+          { keys: "+", desc: "Add focused queue track to draft" },
+          { keys: "−", desc: "Remove focused queue track from draft" },
         ],
       },
       {
@@ -4521,7 +4550,11 @@
       countEl.textContent = n > 0 ? ` (${n})` : "";
     }
 
-    function neighborTrackMetaHtml(track, score = null) {
+    function neighborDraftRowHtml(inDraft) {
+      return `<span class="neighbor-meta-row neighbor-meta-row-draft"><span class="tt-badge draft-in neighbor-badge${inDraft ? " is-on" : ""}" aria-hidden="${inDraft ? "false" : "true"}">draft</span></span>`;
+    }
+
+    function neighborTrackMetaHtml(track, score = null, inDraft = false) {
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
       const keyText = SetaRenderSafe.html(track.key || "?");
       const keyColor = camelotColor(track.key);
@@ -4529,34 +4562,36 @@
         <span class="tt-badge bpm neighbor-badge">${bpmVal}</span>
         <span class="tt-badge key neighbor-badge" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
       </span>`;
-      if (score == null) {
-        return `<span class="neighbor-meta neighbor-meta--anchor">${statsRow}</span>`;
-      }
-      const scoreRow = `<span class="neighbor-meta-row neighbor-meta-row-score">
-        <span class="tt-badge mix-score neighbor-badge">${Math.round(score * 100)}%</span>
-      </span>`;
-      return `<span class="neighbor-meta">${scoreRow}${statsRow}</span>`;
+      const draftBadge = neighborDraftRowHtml(inDraft);
+      const scoreContent = score != null
+        ? `<span class="tt-badge mix-score neighbor-badge">${Math.round(score * 100)}%</span>`
+        : "";
+      const scoreRow = `<span class="neighbor-meta-row neighbor-meta-row-score">${scoreContent}</span>`;
+      const metaClass = score == null ? "neighbor-meta neighbor-meta--anchor" : "neighbor-meta";
+      return `<span class="${metaClass}">${scoreRow}${draftBadge}${statsRow}</span>`;
     }
 
-    function neighborListItemHtml(track, { anchor = false, rank = null, score = null, playing = false } = {}) {
+    function neighborListItemHtml(track, { anchor = false, rank = null, score = null, playing = false, inDraft = false } = {}) {
       const rankClass = anchor ? "neighbor-rank is-dot" : "neighbor-rank";
       const rankLabel = anchor ? "" : (rank != null ? String(rank) : "");
       const classes = [
         "neighbor-item",
         playing ? "is-active" : "",
+        inDraft ? "is-in-draft" : "",
       ].filter(Boolean).join(" ");
       const title = SetaRenderSafe.html(track.title || "Unknown title");
       const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
       const trackId = SetaRenderSafe.attr(track.id);
+      const draftLabel = inDraft ? " · in draft" : "";
       return `
         <li>
-          <button type="button" class="${classes}" data-track-id="${trackId}" role="option" aria-selected="${playing ? "true" : "false"}">
+          <button type="button" class="${classes}" data-track-id="${trackId}" role="option" aria-selected="${playing ? "true" : "false"}" aria-label="${title}${draftLabel}">
             <span class="${rankClass}">${rankLabel}</span>
             <span class="neighbor-main">
               <span class="neighbor-title">${title}</span>
               <span class="neighbor-artist">${artist}</span>
             </span>
-            ${neighborTrackMetaHtml(track, score)}
+            ${neighborTrackMetaHtml(track, score, inDraft)}
           </button>
         </li>`;
     }
@@ -4575,6 +4610,7 @@
 
       const anchorId = neighborAnchorId();
       const neighborsListReady = isNeighborsPanelOpen() && !!anchorId;
+      const preserveFocusId = neighborsListReady && canQueueKeyboardNav() ? queueFocusTrackId() : null;
 
       if (!neighborsListReady) {
         list.innerHTML = "";
@@ -4603,11 +4639,13 @@
       }
 
       const { list: neighbors } = mixNeighbors(anchorId, tracks);
+      const draftIds = draftTrackIdSet();
 
       if (!neighbors.length) {
         list.innerHTML = neighborListItemHtml(anchor, {
           anchor: true,
           playing: state.playingId === anchor.id,
+          inDraft: draftIds.has(anchor.id),
         });
         emptyEl.hidden = false;
         emptyEl.textContent = "No mixable neighbors in current filters.";
@@ -4617,20 +4655,38 @@
           neighborListItemHtml(anchor, {
             anchor: true,
             playing: state.playingId === anchor.id,
+            inDraft: draftIds.has(anchor.id),
           }),
           ...neighbors.map((track, index) => neighborListItemHtml(track, {
             rank: index + 1,
             score: mixScore(anchor, track),
             playing: state.playingId === track.id,
+            inDraft: draftIds.has(track.id),
           })),
         ].join("");
       }
 
-      scrollNeighborItemIntoView(state.playingId || anchorId);
       syncEllipsisTooltips(list);
-      initQueueFocusFromPlaying();
+      restoreQueueFocusAfterListRebuild(preserveFocusId);
       updateMixDockChrome();
       updateDraftUi();
+    }
+
+    function restoreQueueFocusAfterListRebuild(preserveFocusId) {
+      const items = neighborQueueItems();
+      if (!items.length || !canQueueKeyboardNav()) {
+        state.queueFocusIndex = -1;
+        return;
+      }
+      if (preserveFocusId) {
+        const idx = items.findIndex(el => el.dataset.trackId === preserveFocusId);
+        if (idx >= 0) {
+          state.queueFocusIndex = idx;
+          syncQueueFocusHighlight();
+          return;
+        }
+      }
+      initQueueFocusFromPlaying();
     }
 
     function viewFilterSignature() {
@@ -5123,6 +5179,24 @@
       return true;
     }
 
+    function queueFocusTrackId() {
+      const items = neighborQueueItems();
+      if (!items.length) return null;
+      const idx = state.queueFocusIndex >= 0 ? state.queueFocusIndex : 0;
+      return items[idx]?.dataset.trackId || null;
+    }
+
+    function toggleDraftForQueueFocus(add) {
+      if (!canQueueKeyboardNav() || state.mixDockTab !== "neighbors") return;
+      const trackId = queueFocusTrackId();
+      if (!trackId) return;
+      if (add) {
+        if (!draftTrackIdSet().has(trackId)) addTrackToActiveDraft(trackId);
+      } else if (draftTrackIdSet().has(trackId)) {
+        removeTrackFromActiveDraft(trackId);
+      }
+    }
+
     function activateQueueFocus() {
       const items = neighborQueueItems();
       const el = items[state.queueFocusIndex];
@@ -5425,6 +5499,20 @@
       if (canQueueKeyboardNav() && !event.shiftKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
         event.preventDefault();
         moveQueueFocus(event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+
+      if (canQueueKeyboardNav() && state.mixDockTab === "neighbors" && !event.ctrlKey && !event.metaKey && !event.altKey
+        && (event.key === "+" || event.key === "=" || event.code === "Equal")) {
+        event.preventDefault();
+        toggleDraftForQueueFocus(true);
+        return;
+      }
+
+      if (canQueueKeyboardNav() && state.mixDockTab === "neighbors" && !event.ctrlKey && !event.metaKey && !event.altKey
+        && (event.key === "-" || event.key === "_" || event.code === "Minus")) {
+        event.preventDefault();
+        toggleDraftForQueueFocus(false);
         return;
       }
 
