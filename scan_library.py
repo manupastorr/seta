@@ -21,6 +21,7 @@ CURATE_ROOT = curate_root()
 CACHE_PATH = APP_DIR / "cache.json"
 LIBRARY_PATH = APP_DIR / "library.json"
 AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}
+PARALLEL_CACHE_SAVE_EVERY = 25
 # soundcloud-set-id writes short Shazam probe clips here — not library tracks.
 SET_ID_SAMPLE_DIR = "samples"
 SET_ID_SAMPLE_PREFIX = "sample_"
@@ -238,6 +239,8 @@ def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
                 done += 1
                 if done % 25 == 0 or done == len(files):
                     print(f"  analyzed {done}/{len(files)}")
+                if done % PARALLEL_CACHE_SAVE_EVERY == 0 or done == len(files):
+                    save_cache(cache)
     save_cache(cache)
     return [track_record(path, results[str(path.resolve())]) for path in files]
 
