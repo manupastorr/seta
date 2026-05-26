@@ -62,7 +62,7 @@ Covers scanner path rules, Camelot/mix scoring, play-queue navigation (`static/p
 
 ## Analysis vs Rekordbox
 
-BPM, energy, and Camelot key are **local analysis aids** for map placement and mix hints—not Rekordbox truth. Energy and key have no separate confidence field; BPM exposes `bpm_confidence`. When `bpm_confidence` is low (UI/tooltip threshold **0.45**), verify tempo in Rekordbox before trusting grid position or mix links.
+BPM, energy, and Camelot key are **local analysis aids** for map placement and mix hints—not Rekordbox truth. BPM exposes `bpm_confidence`; energy exposes `energy_confidence`; key still has no separate confidence field. When `bpm_confidence` is low (UI/tooltip threshold **0.45**), verify tempo in Rekordbox before trusting grid position or mix links.
 
 ## Scanner rules
 
@@ -83,9 +83,11 @@ UI fields: `bpm`, `bpm_raw`, `bpm_octave_corrected`, `bpm_source`, `bpm_confiden
 
 `vocals` is heuristic (`yes` / `no` / `unclear`) from HPSS harmonic/percussive split, mel-band contrast, and harmonic periodicity (autocorrelation — not `librosa.yin`) on the first ~45s — not speech recognition. Show the player badge only when `vocals_confidence` ≥ 0.45.
 
+Energy fields on each track: `energy` is retained for old consumers. Current consumers should use `energy_effective` with fallback to `energy_auto`, `energy_main`, then `energy`. The scanner writes `energy_main`, `energy_avg`, `energy_peak`, `energy_intro`, `energy_outro`, `energy_confidence`, and `energy_curve` from full-track 32-bar phrase windows; when BPM is unknown, the phrase window falls back to 45 seconds. Web manual overrides live in `localStorage` (`seta-energy-overrides-v1`) and are not written to `library.json`.
+
 Waveform fields on each track: `waveform_version`, `waveform_peak`, `waveform_low`, `waveform_mid`, `waveform_high` (400 bars from the first ~90s analysis window — intro/main preview, not full-track shape).
 
-Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a library-wide adaptive floor (p3 of scanned energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. Set-zone filters still use raw 0–1 energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
+Map BPM domain: **70–180**. Intensity **values** stay **0–1** in `library.json`; the map **Y axis** runs from a filtered adaptive floor (p3 of effective energies, padded, min span 0.4) up to **1.0** so dense libraries spread vertically without clipping peak tracks. Set-zone filters use effective energy. Bump `ANALYSIS_VERSION` after analysis logic changes.
 
 ## UI conventions
 

@@ -11,7 +11,7 @@ from analyze import ANALYSIS_VERSION, _detect_vocals, _harmonic_voiced_strength,
 
 class AnalyzeVocalsTests(unittest.TestCase):
     def test_analysis_version_bumped(self) -> None:
-        self.assertEqual(ANALYSIS_VERSION, 12)
+        self.assertEqual(ANALYSIS_VERSION, 13)
 
     def test_detect_vocals_short_audio(self) -> None:
         y = np.zeros(22050 * 4, dtype=np.float32)

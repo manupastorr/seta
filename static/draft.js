@@ -140,16 +140,30 @@
     return touchDraft(draft);
   }
 
+  function effectiveEnergy(track, fallback = 0.5) {
+    const candidates = [
+      track?.energy_manual,
+      track?.energy_effective,
+      track?.energy_auto,
+      track?.energy_main,
+      track?.energy,
+    ];
+    for (const value of candidates) {
+      if (Number.isFinite(value)) return Math.max(0, Math.min(1, value));
+    }
+    return fallback;
+  }
+
   function compareTracks(a, b, sortMode) {
     if (sortMode === "bpm") {
       const da = a.bpm ?? Infinity;
       const db = b.bpm ?? Infinity;
       if (da !== db) return da - db;
-      return (a.energy ?? 0) - (b.energy ?? 0);
+      return effectiveEnergy(a, 0) - effectiveEnergy(b, 0);
     }
     if (sortMode === "energy") {
-      const da = a.energy ?? 0;
-      const db = b.energy ?? 0;
+      const da = effectiveEnergy(a, 0);
+      const db = effectiveEnergy(b, 0);
       if (da !== db) return da - db;
       return (a.bpm ?? 0) - (b.bpm ?? 0);
     }
@@ -205,7 +219,7 @@
         const meta = [
           track.bpm != null ? `${Math.round(track.bpm)} BPM` : null,
           track.key || null,
-          track.energy != null ? `E ${track.energy.toFixed(2)}` : null,
+          `E ${effectiveEnergy(track).toFixed(2)}`,
         ].filter(Boolean).join(" · ");
         const note = draft.notes?.[track.id];
         const star = (draft.finalIds || []).includes(track.id) ? "★ " : "";
@@ -216,7 +230,7 @@
 
   function energyRampPoints(tracks, width = 200, height = 36, pad = 3) {
     if (!tracks.length) return { path: "", points: [] };
-    const energies = tracks.map(t => t.energy ?? 0);
+    const energies = tracks.map(t => effectiveEnergy(t, 0));
     const min = Math.min(...energies);
     const max = Math.max(...energies);
     const span = Math.max(max - min, 0.08);
@@ -224,7 +238,7 @@
     const innerH = height - pad * 2;
     const points = tracks.map((track, index) => {
       const x = pad + (tracks.length === 1 ? innerW / 2 : (index / (tracks.length - 1)) * innerW);
-      const y = pad + innerH - (((track.energy ?? 0) - min) / span) * innerH;
+      const y = pad + innerH - ((effectiveEnergy(track, 0) - min) / span) * innerH;
       return { x, y, id: track.id };
     });
     const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -265,6 +279,7 @@
     toggleFinalInDraft,
     setDraftNote,
     setDraftSortMode,
+    effectiveEnergy,
     resolveDraftTracks,
     moveDraftTrack,
     reorderDraftByDisplayIndex,

@@ -1,6 +1,6 @@
 # Seta 🍄
 
-Local web app to browse a DJ library on a **BPM × energy** map, with **Camelot** mix hints, playback, and set-moment overlays. BPM, energy, and key come from local analysis (~90s sample per file)—useful for exploration, not a substitute for Rekordbox when confidence is low.
+Local web app to browse a DJ library on a **BPM × energy** map, with **Camelot** mix hints, playback, and set-moment overlays. BPM, energy, and key come from local analysis: useful for exploration, not a substitute for Rekordbox when confidence is low.
 
 Default scan folders (override with `.env`):
 
@@ -95,7 +95,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 |-------|------|
 | `config.py` | Paths and port from env / `.env` |
 | `scan_library.py` | Walks audio folders, analyzes tracks, writes `library.json` + mix edges |
-| `analyze.py` | BPM (`bpm_confidence`), Camelot key, energy, vocals hint, Serato-style waveform peaks (400 bars from first ~90s window) |
+| `analyze.py` | BPM (`bpm_confidence`), Camelot key, phrase-based energy, vocals hint, Serato-style waveform peaks (400 bars from first ~90s window) |
 | `camelot.py` | Wheel colors + mix compatibility scoring |
 | `server.py` | Flask: UI, `/api/library`, audio streaming |
 | `static/index.html` | Single-page D3 map + player |
@@ -105,6 +105,18 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 - **Mix map** — tracks placed by BPM (x) and energy (y); soft clustering when many share the same values
 - **Explore** — force graph by mix links; BPM/energy grid + set-moment clouds stay as background reference
 - **Set draft** — shortlist tracks for a set (~50 target): add/remove, final marks, notes, energy ramp, draft-only filter, M3U/text export (persisted in browser `localStorage`)
+- **Manual intensity** — hover a track and adjust the tooltip slider to override map/draft energy locally; click `Auto` to return to scanner output.
+
+### Energy fields
+
+The scanner keeps `energy` for backward compatibility and also writes:
+
+- `energy_auto` / `energy_effective`: generated score used by current web/mac UIs unless a local manual override exists.
+- `energy_main`, `energy_avg`, `energy_peak`, `energy_intro`, `energy_outro`: full-track phrase summary scores.
+- `energy_confidence`: confidence in one scalar representing the full track; high variation lowers it.
+- `energy_curve`: ordered 32-bar phrase scores, using a 45s fallback window when BPM is unknown.
+
+Manual overrides are not written into `library.json`; the web app stores them in browser `localStorage` under `seta-energy-overrides-v1`.
 
 ### Generated files (gitignored)
 
@@ -113,7 +125,7 @@ Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.js
 - `scan.log`
 - `.env` — local path overrides
 
-Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze.py`).
+Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze.py`). Energy model changes require a fresh analysis pass because the phrase curve is derived from the audio, not from older cache entries.
 
 ## Tests
 

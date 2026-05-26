@@ -41,6 +41,15 @@ REQUIRED_TRACK_FIELDS = {
 OPTIONAL_TRACK_FIELDS = {
     "vocals",
     "vocals_confidence",
+    "energy_auto",
+    "energy_effective",
+    "energy_main",
+    "energy_avg",
+    "energy_peak",
+    "energy_intro",
+    "energy_outro",
+    "energy_confidence",
+    "energy_curve",
     "waveform_version",
     "waveform_peak",
     "waveform_low",
@@ -87,6 +96,28 @@ def library_errors(library: dict) -> list[str]:
             vocals_conf < 0 or vocals_conf > 1
         ):
             errors.append(f"tracks[{idx}] vocals_confidence out of range: {vocals_conf}")
+        for field in (
+            "energy",
+            "energy_auto",
+            "energy_effective",
+            "energy_main",
+            "energy_avg",
+            "energy_peak",
+            "energy_intro",
+            "energy_outro",
+            "energy_confidence",
+        ):
+            value = track.get(field)
+            if value is not None and not isinstance(value, (int, float)):
+                errors.append(f"tracks[{idx}] {field} must be numeric")
+            elif isinstance(value, (int, float)) and (value < 0 or value > 1):
+                errors.append(f"tracks[{idx}] {field} out of range: {value}")
+        curve = track.get("energy_curve")
+        if curve is not None:
+            if not isinstance(curve, list):
+                errors.append(f"tracks[{idx}] energy_curve must be a list")
+            elif any(not isinstance(v, (int, float)) or v < 0 or v > 1 for v in curve):
+                errors.append(f"tracks[{idx}] energy_curve contains invalid values")
 
     edges = library.get("edges")
     if not isinstance(edges, list):
@@ -328,6 +359,15 @@ class LibrarySanityTests(unittest.TestCase):
             "bpm_confidence": 0.35,
             "key": "8A",
             "energy": 0.7,
+            "energy_auto": 0.7,
+            "energy_effective": 0.7,
+            "energy_main": 0.68,
+            "energy_avg": 0.69,
+            "energy_peak": 0.75,
+            "energy_intro": 0.55,
+            "energy_outro": 0.6,
+            "energy_confidence": 0.72,
+            "energy_curve": [0.55, 0.68, 0.75, 0.6],
             "vocals": "unclear",
             "vocals_confidence": 0.42,
             "analysis_error": None,

@@ -62,6 +62,12 @@ class AnalyzeIntegrationTests(unittest.TestCase):
         self.assertLessEqual(result["bpm"], 138.0)
         self.assertGreaterEqual(result["energy"], 0.0)
         self.assertLessEqual(result["energy"], 1.0)
+        self.assertEqual(result["energy"], result["energy_effective"])
+        self.assertGreaterEqual(result["energy_main"], 0.0)
+        self.assertLessEqual(result["energy_main"], 1.0)
+        self.assertGreaterEqual(result["energy_peak"], 0.0)
+        self.assertLessEqual(result["energy_peak"], 1.0)
+        self.assertIsInstance(result["energy_curve"], list)
 
 
 if __name__ == "__main__":

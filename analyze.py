@@ -12,13 +12,17 @@ from camelot import pitch_class_to_camelot
 
 ANALYSIS_SECONDS = 90
 TARGET_SR = 22050
-ANALYSIS_VERSION = 12
+ANALYSIS_VERSION = 13
 WAVEFORM_BARS = 400
 WAVEFORM_VERSION = 1
 BPM_MIN = 70.0
 BPM_MAX = 180.0
 BPM_MAP_MIN = 70.0
 HOP_LENGTH = 512
+PHRASE_BARS = 32
+BEATS_PER_BAR = 4
+FALLBACK_ENERGY_WINDOW_SECONDS = 45.0
+MIN_ENERGY_WINDOW_SECONDS = 8.0
 
 # Embedded tags below this are often half-time grids on peak-time electronic tracks.
 HALFTIME_TAG_MIN = 68.0
@@ -494,7 +498,7 @@ def _compute_waveform_peaks(y: np.ndarray, sr: int, bar_count: int = WAVEFORM_BA
     }
 
 
-def _detect_energy(y: np.ndarray, sr: int) -> float:
+def _detect_energy_value(y: np.ndarray, sr: int) -> float:
     if len(y) < sr:
         return 0.5
     rms = librosa.feature.rms(y=y)[0]
@@ -504,6 +508,73 @@ def _detect_energy(y: np.ndarray, sr: int) -> float:
     flux = librosa.onset.onset_strength(y=y, sr=sr)
     flux_n = float(np.clip(np.std(flux) * 4, 0, 1))
     return round(0.5 * rms_n + 0.35 * cent_n + 0.15 * flux_n, 3)
+
+
+def _energy_window_seconds(bpm: float | None) -> float:
+    if bpm is None or not np.isfinite(bpm) or bpm <= 0:
+        return FALLBACK_ENERGY_WINDOW_SECONDS
+    return PHRASE_BARS * BEATS_PER_BAR * 60.0 / float(bpm)
+
+
+def _detect_energy_profile(y: np.ndarray, sr: int, bpm: float | None = None) -> dict:
+    if len(y) < sr:
+        return {
+            "energy": 0.5,
+            "energy_auto": 0.5,
+            "energy_effective": 0.5,
+            "energy_main": 0.5,
+            "energy_avg": 0.5,
+            "energy_peak": 0.5,
+            "energy_intro": 0.5,
+            "energy_outro": 0.5,
+            "energy_confidence": 0.0,
+            "energy_curve": [],
+        }
+
+    window_seconds = _energy_window_seconds(bpm)
+    window_samples = max(int(MIN_ENERGY_WINDOW_SECONDS * sr), int(window_seconds * sr))
+    min_samples = int(MIN_ENERGY_WINDOW_SECONDS * sr)
+    scores: list[float] = []
+
+    for start in range(0, len(y), window_samples):
+        segment = y[start : start + window_samples]
+        if len(segment) < min_samples and scores:
+            break
+        if len(segment) >= sr:
+            scores.append(_detect_energy_value(segment, sr))
+
+    if not scores:
+        scores = [_detect_energy_value(y, sr)]
+
+    values = np.asarray(scores, dtype=float)
+    core = values[1:-1] if len(values) >= 4 else values
+    energy_main = float(np.median(core))
+    energy_avg = float(np.mean(values))
+    energy_peak = float(np.percentile(values, 90))
+    energy_intro = float(values[0])
+    energy_outro = float(values[-1])
+    energy_auto = float(np.clip(0.55 * energy_main + 0.25 * energy_avg + 0.20 * energy_peak, 0, 1))
+
+    spread = float(np.std(values))
+    coverage = min(1.0, len(values) / 6.0)
+    confidence = float(np.clip(0.35 + coverage * 0.45 - spread * 0.45, 0.05, 0.95))
+
+    return {
+        "energy": round(energy_auto, 3),
+        "energy_auto": round(energy_auto, 3),
+        "energy_effective": round(energy_auto, 3),
+        "energy_main": round(energy_main, 3),
+        "energy_avg": round(energy_avg, 3),
+        "energy_peak": round(energy_peak, 3),
+        "energy_intro": round(energy_intro, 3),
+        "energy_outro": round(energy_outro, 3),
+        "energy_confidence": round(confidence, 3),
+        "energy_curve": [round(float(v), 3) for v in values],
+    }
+
+
+def _detect_energy(y: np.ndarray, sr: int) -> float:
+    return _detect_energy_value(y, sr)
 
 
 def _estimate_bpm_confidence(
@@ -543,6 +614,15 @@ def analyze_track(path: Path) -> dict:
             "bpm_confidence": None,
             "key": None,
             "energy": 0.5,
+            "energy_auto": 0.5,
+            "energy_effective": 0.5,
+            "energy_main": 0.5,
+            "energy_avg": 0.5,
+            "energy_peak": 0.5,
+            "energy_intro": 0.5,
+            "energy_outro": 0.5,
+            "energy_confidence": 0.0,
+            "energy_curve": [],
             "vocals": "unclear",
             "vocals_confidence": None,
             "waveform": None,
@@ -562,6 +642,14 @@ def analyze_track(path: Path) -> dict:
 
     pool = _build_bpm_pool(bpm_raw, tempo_candidates, tagged)
     bpm_confidence = _estimate_bpm_confidence(onset_env, sr, bpm, pool)
+    energy_y = y
+    energy_sr = sr
+    if duration_sec is None or duration_sec > ANALYSIS_SECONDS + 1:
+        try:
+            energy_y, energy_sr = _load_mono(path, max_seconds=None)
+        except Exception:
+            energy_y, energy_sr = y, sr
+    energy_profile = _detect_energy_profile(energy_y, energy_sr, bpm)
 
     return {
         "analysis_version": ANALYSIS_VERSION,
@@ -572,7 +660,7 @@ def analyze_track(path: Path) -> dict:
         "bpm_source": bpm_source,
         "bpm_confidence": bpm_confidence,
         "key": _detect_key(y, sr)[0],
-        "energy": _detect_energy(y, sr),
+        **energy_profile,
         "vocals": vocals,
         "vocals_confidence": vocals_confidence,
         "waveform": waveform,

@@ -52,6 +52,20 @@
     return { ids, list };
   }
 
+  function effectiveEnergy(track, fallback = 0.5) {
+    const candidates = [
+      track?.energy_manual,
+      track?.energy_effective,
+      track?.energy_auto,
+      track?.energy_main,
+      track?.energy,
+    ];
+    for (const value of candidates) {
+      if (Number.isFinite(value)) return Math.max(0, Math.min(1, value));
+    }
+    return fallback;
+  }
+
   function sortDraftTracks(tracks, sortMode) {
     if (sortMode === "manual") return tracks.slice();
     return tracks.slice().sort((a, b) => {
@@ -59,10 +73,10 @@
         const da = a.bpm ?? Infinity;
         const db = b.bpm ?? Infinity;
         if (da !== db) return da - db;
-        return (a.energy ?? 0) - (b.energy ?? 0);
+        return effectiveEnergy(a, 0) - effectiveEnergy(b, 0);
       }
-      const da = a.energy ?? 0;
-      const db = b.energy ?? 0;
+      const da = effectiveEnergy(a, 0);
+      const db = effectiveEnergy(b, 0);
       if (da !== db) return da - db;
       return (a.bpm ?? 0) - (b.bpm ?? 0);
     });
@@ -138,6 +152,7 @@
     mixScore,
     mixNeighbors,
     sortDraftTracks,
+    effectiveEnergy,
     buildDraftQueue,
     buildNavigableTracks,
     queueSignature,

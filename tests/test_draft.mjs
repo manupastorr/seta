@@ -31,6 +31,18 @@ test("resolveDraftTracks sorts by energy then bpm", () => {
   assert.deepEqual(sorted.map(t => t.id), ["low", "mid", "high"]);
 });
 
+test("resolveDraftTracks uses effective manual energy when present", () => {
+  const low = track("low", "Low", 0.2, 120);
+  const high = track("high", "High", 0.8, 121);
+  low.energy_effective = 0.9;
+  high.energy_manual = 0.1;
+  const byId = new Map([low, high].map(t => [t.id, t]));
+  const draft = Draft.createDraft();
+  draft.trackIds = ["low", "high"];
+  draft.sortMode = "energy";
+  assert.deepEqual(Draft.resolveDraftTracks(draft, byId).map(t => t.id), ["high", "low"]);
+});
+
 test("exportDraftM3u includes paths", () => {
   const draft = Draft.createDraft("Export");
   draft.trackIds = ["a"];

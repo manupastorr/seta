@@ -1520,7 +1520,7 @@
 
     .tooltip {
       position: fixed;
-      pointer-events: none;
+      pointer-events: auto;
       background: rgba(255, 255, 255, 0.98);
       border: 1px solid var(--panel-border);
       border-radius: 12px;
@@ -1627,6 +1627,33 @@
 
     .tooltip-meta span + span::before {
       content: " · ";
+    }
+
+    .tooltip-energy-editor {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 6px 8px;
+      margin: 8px 0;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .tooltip-energy-editor input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .tooltip-energy-editor button {
+      border: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.85);
+      color: var(--muted);
+      border-radius: 999px;
+      font: inherit;
+      font-weight: 700;
+      padding: 2px 7px;
+      cursor: pointer;
     }
 
     .topbar {
@@ -2546,6 +2573,7 @@
       },
     ];
     const SEARCH_MAX_RESULTS = 12;
+    const ENERGY_OVERRIDE_STORAGE_KEY = "seta-energy-overrides-v1";
     let ellipsisTipEl = null;
     let ellipsisTipTimer = null;
     let ellipsisTipAnchor = null;
@@ -2632,6 +2660,7 @@
       shortcutsOpen: false,
       queueFocusIndex: -1,
       energyDisplayDomain: null,
+      energyOverrides: {},
       draftStore: { activeId: null, drafts: {} },
       mixDockTab: "neighbors",
       mixDockNeighborsOpen: false,
@@ -2888,6 +2917,95 @@
 
     function findTrackById(trackId) {
       return state.data?.tracks?.find(t => t.id === trackId) ?? null;
+    }
+
+    function clampEnergy(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function baseEnergy(track, fallback = 0.5) {
+      const values = [
+        track?.energy_auto,
+        track?.energy_main,
+        track?.energy_effective,
+        track?.energy,
+      ];
+      for (const value of values) {
+        if (Number.isFinite(value)) return clampEnergy(value);
+      }
+      return fallback;
+    }
+
+    function effectiveEnergy(track, fallback = 0.5) {
+      const override = track?.id ? state.energyOverrides[track.id] : null;
+      if (Number.isFinite(override)) return clampEnergy(override);
+      const values = [
+        track?.energy_manual,
+        track?.energy_effective,
+        track?.energy_auto,
+        track?.energy_main,
+        track?.energy,
+      ];
+      for (const value of values) {
+        if (Number.isFinite(value)) return clampEnergy(value);
+      }
+      return fallback;
+    }
+
+    function applyEnergyOverrides(tracks = state.data?.tracks || []) {
+      for (const track of tracks) {
+        const manual = state.energyOverrides[track.id];
+        if (Number.isFinite(manual)) {
+          track.energy_manual = clampEnergy(manual);
+          track.energy_effective = track.energy_manual;
+        } else {
+          delete track.energy_manual;
+          track.energy_effective = baseEnergy(track);
+        }
+      }
+    }
+
+    function loadEnergyOverrides() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(ENERGY_OVERRIDE_STORAGE_KEY) || "{}");
+        const overrides = {};
+        for (const [id, value] of Object.entries(parsed || {})) {
+          if (typeof id === "string" && Number.isFinite(value)) overrides[id] = clampEnergy(value);
+        }
+        state.energyOverrides = overrides;
+      } catch (_) {
+        state.energyOverrides = {};
+      }
+    }
+
+    function persistEnergyOverrides() {
+      localStorage.setItem(ENERGY_OVERRIDE_STORAGE_KEY, JSON.stringify(state.energyOverrides));
+    }
+
+    function setManualEnergy(trackId, value) {
+      const track = findTrackById(trackId);
+      if (!track || !Number.isFinite(value)) return;
+      state.energyOverrides[trackId] = clampEnergy(value);
+      track.energy_manual = state.energyOverrides[trackId];
+      track.energy_effective = track.energy_manual;
+      persistEnergyOverrides();
+      state.energyDisplayDomain = computeEnergyDisplayDomain(filteredTracks());
+      renderGraph();
+      updateDraftUi();
+      if (state.playingId === trackId) updatePlayerTrack(track);
+    }
+
+    function clearManualEnergy(trackId) {
+      const track = findTrackById(trackId);
+      if (!track) return;
+      delete state.energyOverrides[trackId];
+      delete track.energy_manual;
+      track.energy_effective = baseEnergy(track);
+      persistEnergyOverrides();
+      state.energyDisplayDomain = computeEnergyDisplayDomain(filteredTracks());
+      renderGraph();
+      updateDraftUi();
+      if (state.playingId === trackId) updatePlayerTrack(track);
     }
 
     function waveformFromLibrary(track) {
@@ -3251,7 +3369,8 @@
         state.pointerDragged = false;
       });
 
-      svg.on("mouseleave.graph", () => {
+      svg.on("mouseleave.graph", (event) => {
+        if (event.relatedTarget && tooltip.contains(event.relatedTarget)) return;
         hideLoupe();
         hideGraphHover();
       });
@@ -3317,7 +3436,7 @@
     }
 
     function computeEnergyDisplayDomain(tracks) {
-      const energies = tracks.map(t => t.energy).filter(e => e != null && Number.isFinite(e));
+      const energies = tracks.map(t => effectiveEnergy(t)).filter(e => e != null && Number.isFinite(e));
       if (energies.length < 2) return ENERGY_DISPLAY.fallback.slice();
 
       const sorted = [...energies].sort((a, b) => a - b);
@@ -3393,7 +3512,7 @@
       const cx = track.bpm != null
         ? x(track.bpm)
         : x(PLOT.bpmDomain[0] + (PLOT.bpmDomain[1] - PLOT.bpmDomain[0]) / 2);
-      const cy = y(track.energy ?? 0.5);
+      const cy = y(effectiveEnergy(track));
       let px = cx;
       let py = cy;
       if (jitter) {
@@ -3409,7 +3528,7 @@
 
     function trackMatchesMoment(track, moment) {
       if (track.bpm == null) return false;
-      const energy = track.energy ?? 0.5;
+      const energy = effectiveEnergy(track);
       return track.bpm >= moment.bpm[0]
         && track.bpm <= moment.bpm[1]
         && energy >= moment.energy[0]
@@ -4074,7 +4193,7 @@
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : "?";
       const keyText = SetaRenderSafe.html(track.key || "?");
       const keyColor = camelotColor(track.key);
-      const energyVal = track.energy != null ? track.energy.toFixed(2) : "?";
+      const energyVal = effectiveEnergy(track).toFixed(2);
       const energyRow = `<span class="neighbor-meta-row neighbor-meta-row-score">
         <span class="tt-badge energy neighbor-badge" title="Intensity">${energyVal}</span>
       </span>`;
@@ -4895,11 +5014,12 @@
       const bpmVal = track.bpm != null ? Math.round(track.bpm) : null;
       const keyText = SetaRenderSafe.html(track.key || "?");
       const keyColor = camelotColor(track.key);
-      const energy = (track.energy ?? 0.5).toFixed(2);
+      const energy = effectiveEnergy(track).toFixed(2);
+      const source = Number.isFinite(track.energy_manual) ? "manual" : "auto";
       return `
         <span class="tt-badge bpm">${bpmVal != null ? bpmVal : "?"} BPM</span>
         <span class="tt-badge key" style="border-color:${keyColor}44;background:${keyColor}1a">${keyText}</span>
-        <span class="tt-badge energy" title="Estimated intensity (0–1, map Y uses library range)">Int ${energy}</span>
+        <span class="tt-badge energy" title="${source === "manual" ? "Manual" : "Estimated"} intensity (0–1, map Y uses library range)">Int ${energy}${source === "manual" ? " M" : ""}</span>
         ${vocalsBadgeHtml(track)}
       `;
     }
@@ -5047,11 +5167,18 @@
       const title = SetaRenderSafe.html(track.title || "Unknown title");
       const artist = SetaRenderSafe.html(track.artist || "Unknown artist");
       const warning = SetaRenderSafe.html(warn);
+      const energy = effectiveEnergy(track);
+      const manual = Number.isFinite(track.energy_manual);
 
       return `
         <div class="tooltip-title">${title}</div>
         <div class="tooltip-artist">${artist}</div>
         <div class="tooltip-badges">${trackBadgeHtml(track)}</div>
+        <div class="tooltip-energy-editor" data-track-id="${SetaRenderSafe.attr(track.id)}">
+          <span>Manual intensity ${manual ? energy.toFixed(2) : "(auto)"}</span>
+          <button type="button" data-energy-clear="${SetaRenderSafe.attr(track.id)}">Auto</button>
+          <input type="range" min="0" max="1" step="0.01" value="${energy.toFixed(2)}" data-energy-manual="${SetaRenderSafe.attr(track.id)}" aria-label="Manual intensity">
+        </div>
         ${warning ? `<div class="tooltip-warn">${warning}</div>` : ""}
         ${meta ? `<div class="tooltip-meta">${meta}</div>` : ""}
       `;
@@ -5681,6 +5808,7 @@
 
     function renderGraph() {
       const tracks = filteredTracks();
+      state.energyDisplayDomain = computeEnergyDisplayDomain(tracks);
       updateNeighborList(tracks);
       syncUiLayout();
       if (state.hoveredId && !tracks.some(t => t.id === state.hoveredId)) {
@@ -6092,10 +6220,12 @@
       updateCamelotLegend();
       bindGraphInteraction();
       state.draftStore = TD.loadDraftStore(localStorage);
+      loadEnergyOverrides();
       if (!activeDraft()) ensureDraft("Set draft");
       syncInitialMixDockSidebar();
       const res = await fetch("/api/library");
       state.data = await res.json();
+      applyEnergyOverrides(state.data.tracks);
       state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
       populateGenres(state.data.tracks);
       restoreFilterState();
@@ -6131,6 +6261,20 @@
         const btn = event.target.closest(".search-result-item");
         if (!btn?.dataset.trackId) return;
         activateSearchResult(Number(btn.dataset.searchIndex));
+      });
+      tooltip.addEventListener("input", event => {
+        const input = event.target.closest("[data-energy-manual]");
+        if (!input) return;
+        setManualEnergy(input.dataset.energyManual, Number(input.value));
+      });
+      tooltip.addEventListener("click", event => {
+        const btn = event.target.closest("[data-energy-clear]");
+        if (!btn) return;
+        clearManualEnergy(btn.dataset.energyClear);
+      });
+      tooltip.addEventListener("mouseleave", () => {
+        hideLoupe();
+        hideGraphHover();
       });
 
       document.getElementById("genre").addEventListener("change", e => {

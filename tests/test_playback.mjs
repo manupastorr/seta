@@ -9,6 +9,7 @@ const {
   nextPlayIndex,
   queueSignature,
   resolvePlayIndex,
+  sortDraftTracks,
   syncPlayQueueState,
 } = createRequire(import.meta.url)("../static/playback.js");
 
@@ -158,6 +159,16 @@ test("buildNavigableTracks uses draft queue when draft play mode is on", () => {
     draftSortMode: "energy",
   });
   assert.deepEqual(queue.map(t => t.id), [low.id, high.id]);
+});
+
+test("draft energy sorting uses effective manual energy", () => {
+  const low = track("low", "Low", "1A", 100);
+  low.energy = 0.2;
+  low.energy_effective = 0.9;
+  const high = track("high", "High", "2A", 110);
+  high.energy = 0.8;
+  high.energy_manual = 0.1;
+  assert.deepEqual(sortDraftTracks([low, high], "energy").map(t => t.id), [high.id, low.id]);
 });
 
 test("buildNavigableTracks ignores draft queue when draft play mode is off", () => {
