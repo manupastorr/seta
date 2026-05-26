@@ -41,6 +41,10 @@ SetaMac stores manual overrides in `UserDefaults` at `seta-energy-overrides-v1`.
 
 Manual overrides are intentionally not written into `library.json`; that file remains scanner output and can be regenerated safely.
 
+## Cache Behavior
+
+`ANALYSIS_VERSION` is now `13`. Version-12 cache entries with the same file mtime and size are upgraded by running only the full-track energy pass, keeping cached BPM, key, vocals, and waveform fields. Older cache versions still re-run full analysis because their BPM/key behavior may differ from current code.
+
 ## Accuracy Notes
 
 This is more useful than the old first-window estimate because it reads the full track and summarizes phrase-level movement. It is still heuristic: it does not know crowd response, arrangement intent, or genre-specific DJ context. Manual ratings are the future training signal.
@@ -55,4 +59,3 @@ cd ../seta-mac
 swift run SetaMacChecks
 swift build --product SetaMac
 ```
-

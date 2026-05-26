@@ -22,6 +22,7 @@ CACHE_PATH = APP_DIR / "cache.json"
 LIBRARY_PATH = APP_DIR / "library.json"
 AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}
 PARALLEL_CACHE_SAVE_EVERY = 25
+ENERGY_CACHE_UPGRADE_FROM_VERSIONS = {12}
 # soundcloud-set-id writes short Shazam probe clips here — not library tracks.
 SET_ID_SAMPLE_DIR = "samples"
 SET_ID_SAMPLE_PREFIX = "sample_"
@@ -130,14 +131,35 @@ def cached_analysis(path: Path, cache: dict) -> dict | None:
     return None
 
 
+def cached_analysis_for_energy_upgrade(path: Path, cache: dict) -> dict | None:
+    key = str(path.resolve())
+    sig = file_sig(path)
+    cached = cache.get(key)
+    if (
+        cached
+        and cached.get("mtime") == sig["mtime"]
+        and cached.get("size") == sig["size"]
+        and cached.get("analysis_version") in ENERGY_CACHE_UPGRADE_FROM_VERSIONS
+        and cached.get("energy_curve") is None
+    ):
+        return cached
+    return None
+
+
 def analyze_if_needed(path: Path, cache: dict) -> dict:
-    from analyze import analyze_track
+    from analyze import ANALYSIS_VERSION, analyze_track, analyze_track_energy
 
     key = str(path.resolve())
     cached = cached_analysis(path, cache)
     if cached:
         return cached
     sig = file_sig(path)
+    upgrade = cached_analysis_for_energy_upgrade(path, cache)
+    if upgrade:
+        energy = analyze_track_energy(path, upgrade.get("bpm"))
+        entry = {**upgrade, **sig, **energy, "analysis_version": ANALYSIS_VERSION}
+        cache[key] = entry
+        return entry
 
     result = analyze_track(path)
     entry = {**sig, **result}
@@ -152,6 +174,15 @@ def _analyze_worker(path_str: str) -> tuple[str, dict, dict]:
     sig = file_sig(path)
     result = analyze_track(path)
     return path_str, sig, result
+
+
+def _energy_upgrade_worker(path_str: str, cached: dict) -> tuple[str, dict, dict]:
+    from analyze import ANALYSIS_VERSION, analyze_track_energy
+
+    path = Path(path_str)
+    sig = file_sig(path)
+    result = analyze_track_energy(path, cached.get("bpm"))
+    return path_str, sig, {**cached, **result, "analysis_version": ANALYSIS_VERSION}
 
 
 def build_edges(tracks: list[dict], min_score: float = 0.55, max_edges: int = 12000) -> list[dict]:
@@ -224,6 +255,7 @@ def scan_sequential(files: list[Path], cache: dict) -> list[dict]:
 
 def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
     pending: list[str] = []
+    upgrade_pending: list[tuple[str, dict]] = []
     results: dict[str, dict] = {}
 
     for path in files:
@@ -231,15 +263,19 @@ def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
         cached = cached_analysis(path, cache)
         if cached:
             results[path_str] = cached
+        elif upgrade := cached_analysis_for_energy_upgrade(path, cache):
+            upgrade_pending.append((path_str, upgrade))
         else:
             pending.append(path_str)
 
     done = len(results)
     if done:
         print(f"  cached {done}/{len(files)}")
-    if pending:
+    work_count = len(pending) + len(upgrade_pending)
+    if work_count:
         with ProcessPoolExecutor(max_workers=workers) as pool:
             futures = [pool.submit(_analyze_worker, p) for p in pending]
+            futures.extend(pool.submit(_energy_upgrade_worker, p, c) for p, c in upgrade_pending)
             for future in as_completed(futures):
                 path_str, sig, result = future.result()
                 entry = {**sig, **result}

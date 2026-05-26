@@ -9,9 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import scan_library
+import analyze
 from scan_library import (
     build_edges,
     cached_analysis,
+    cached_analysis_for_energy_upgrade,
     classify_path,
     discover_files,
     is_scannable_audio,
@@ -278,6 +280,26 @@ class CacheTests(unittest.TestCase):
                 self.assertEqual(cached_analysis(path, cache)["bpm"], 123)
             with patch("analyze.ANALYSIS_VERSION", 1000):
                 self.assertIsNone(cached_analysis(path, cache))
+
+    def test_version_12_cache_can_upgrade_energy_only(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".wav") as fh:
+            path = Path(fh.name)
+            sig = scan_library.file_sig(path)
+            cache = {
+                str(path.resolve()): {
+                    **sig,
+                    "analysis_version": 12,
+                    "bpm": 124,
+                    "energy": 0.4,
+                }
+            }
+            self.assertIsNotNone(cached_analysis_for_energy_upgrade(path, cache))
+            with patch("analyze.analyze_track_energy", return_value={"energy": 0.7, "energy_curve": [0.7]}):
+                result = scan_library.analyze_if_needed(path, cache)
+            self.assertEqual(result["analysis_version"], analyze.ANALYSIS_VERSION)
+            self.assertEqual(result["bpm"], 124)
+            self.assertEqual(result["energy"], 0.7)
+            self.assertEqual(result["energy_curve"], [0.7])
 
 
 class BuildEdgesTests(unittest.TestCase):

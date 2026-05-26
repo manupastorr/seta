@@ -577,6 +577,26 @@ def _detect_energy(y: np.ndarray, sr: int) -> float:
     return _detect_energy_value(y, sr)
 
 
+def analyze_track_energy(path: Path, bpm: float | None = None) -> dict:
+    try:
+        y, sr = _load_mono(path, max_seconds=None)
+        return _detect_energy_profile(y, sr, bpm)
+    except Exception as exc:
+        return {
+            "energy": 0.5,
+            "energy_auto": 0.5,
+            "energy_effective": 0.5,
+            "energy_main": 0.5,
+            "energy_avg": 0.5,
+            "energy_peak": 0.5,
+            "energy_intro": 0.5,
+            "energy_outro": 0.5,
+            "energy_confidence": 0.0,
+            "energy_curve": [],
+            "analysis_error": str(exc),
+        }
+
+
 def _estimate_bpm_confidence(
     onset_env: np.ndarray, sr: int, bpm: float | None, pool: list[float]
 ) -> float | None:
@@ -642,14 +662,9 @@ def analyze_track(path: Path) -> dict:
 
     pool = _build_bpm_pool(bpm_raw, tempo_candidates, tagged)
     bpm_confidence = _estimate_bpm_confidence(onset_env, sr, bpm, pool)
-    energy_y = y
-    energy_sr = sr
-    if duration_sec is None or duration_sec > ANALYSIS_SECONDS + 1:
-        try:
-            energy_y, energy_sr = _load_mono(path, max_seconds=None)
-        except Exception:
-            energy_y, energy_sr = y, sr
-    energy_profile = _detect_energy_profile(energy_y, energy_sr, bpm)
+    energy_profile = analyze_track_energy(path, bpm)
+    if energy_profile.get("analysis_error"):
+        energy_profile = _detect_energy_profile(y, sr, bpm)
 
     return {
         "analysis_version": ANALYSIS_VERSION,

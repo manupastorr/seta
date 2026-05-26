@@ -125,7 +125,7 @@ Manual overrides are not written into `library.json`; the web app stores them in
 - `scan.log`
 - `.env` — local path overrides
 
-Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze.py`). Energy model changes require a fresh analysis pass because the phrase curve is derived from the audio, not from older cache entries.
+Re-scan after adding tracks or changing analysis (`ANALYSIS_VERSION` in `analyze.py`). Version-12 cache entries are upgraded with an energy-only pass; older cache versions still require full re-analysis.
 
 ## Tests
 
