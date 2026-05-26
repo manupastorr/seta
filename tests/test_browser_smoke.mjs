@@ -173,7 +173,14 @@ test("browser smoke: set draft add, persist, export, and draft-only filter", asy
   await page.reload({ waitUntil: "load" });
   await page.waitForSelector("#graph", { state: "attached" });
   await page.waitForFunction(() => (document.getElementById("draft-tab-count")?.textContent || "").includes("1"));
-  await page.click("#mix-tab-draft");
+  const draftPanelOpen = await page.evaluate(() => {
+    const dock = document.getElementById("mix-dock");
+    const pane = document.getElementById("draft-pane");
+    return !!dock?.classList.contains("is-visible") && pane?.hidden === false;
+  });
+  if (!draftPanelOpen) {
+    await page.click("#mix-tab-draft");
+  }
   await page.waitForSelector("#mix-dock.is-visible");
   await page.waitForSelector("#draft-list .draft-row", { state: "visible" });
 
