@@ -14,6 +14,7 @@ from pathlib import Path
 
 from camelot import mix_score
 from config import curate_root, tracks_root
+from rekordbox import apply_rekordbox, load_rekordbox_index
 
 APP_DIR = Path(__file__).resolve().parent
 TRACKS_ROOT = tracks_root()
@@ -146,43 +147,53 @@ def cached_analysis_for_energy_upgrade(path: Path, cache: dict) -> dict | None:
     return None
 
 
-def analyze_if_needed(path: Path, cache: dict) -> dict:
+def analyze_if_needed(path: Path, cache: dict, rb_index: dict | None = None) -> dict:
     from analyze import ANALYSIS_VERSION, analyze_track, analyze_track_energy
 
     key = str(path.resolve())
     cached = cached_analysis(path, cache)
     if cached:
-        return cached
+        return apply_rekordbox(cached, path, rb_index)
     sig = file_sig(path)
     upgrade = cached_analysis_for_energy_upgrade(path, cache)
     if upgrade:
         energy = analyze_track_energy(path, upgrade.get("bpm"))
-        entry = {**upgrade, **sig, **energy, "analysis_version": ANALYSIS_VERSION}
+        entry = apply_rekordbox(
+            {**upgrade, **sig, **energy, "analysis_version": ANALYSIS_VERSION},
+            path,
+            rb_index,
+        )
         cache[key] = entry
         return entry
 
-    result = analyze_track(path)
+    result = apply_rekordbox(analyze_track(path), path, rb_index)
     entry = {**sig, **result}
     cache[key] = entry
     return entry
 
 
-def _analyze_worker(path_str: str) -> tuple[str, dict, dict]:
+def _analyze_worker(path_str: str, rb_index: dict | None = None) -> tuple[str, dict, dict]:
     from analyze import analyze_track
 
     path = Path(path_str)
     sig = file_sig(path)
-    result = analyze_track(path)
+    result = apply_rekordbox(analyze_track(path), path, rb_index)
     return path_str, sig, result
 
 
-def _energy_upgrade_worker(path_str: str, cached: dict) -> tuple[str, dict, dict]:
+def _energy_upgrade_worker(
+    path_str: str, cached: dict, rb_index: dict | None = None
+) -> tuple[str, dict, dict]:
     from analyze import ANALYSIS_VERSION, analyze_track_energy
 
     path = Path(path_str)
     sig = file_sig(path)
-    result = analyze_track_energy(path, cached.get("bpm"))
-    return path_str, sig, {**cached, **result, "analysis_version": ANALYSIS_VERSION}
+    result = apply_rekordbox(
+        {**cached, **analyze_track_energy(path, cached.get("bpm")), "analysis_version": ANALYSIS_VERSION},
+        path,
+        rb_index,
+    )
+    return path_str, sig, result
 
 
 def build_edges(tracks: list[dict], min_score: float = 0.55, max_edges: int = 12000) -> list[dict]:
@@ -225,6 +236,7 @@ def track_record(path: Path, analysis: dict) -> dict:
         "bpm_source": analysis.get("bpm_source"),
         "bpm_confidence": analysis.get("bpm_confidence"),
         "key": analysis.get("key"),
+        "key_source": analysis.get("key_source"),
         "energy": analysis.get("energy", 0.5),
         "energy_auto": analysis.get("energy_auto", analysis.get("energy", 0.5)),
         "energy_effective": analysis.get("energy_effective", analysis.get("energy", 0.5)),
@@ -242,10 +254,10 @@ def track_record(path: Path, analysis: dict) -> dict:
     }
 
 
-def scan_sequential(files: list[Path], cache: dict) -> list[dict]:
+def scan_sequential(files: list[Path], cache: dict, rb_index: dict | None = None) -> list[dict]:
     tracks: list[dict] = []
     for idx, path in enumerate(files, 1):
-        analysis = analyze_if_needed(path, cache)
+        analysis = analyze_if_needed(path, cache, rb_index)
         if idx % 25 == 0 or idx == len(files):
             print(f"  analyzed {idx}/{len(files)}")
         tracks.append(track_record(path, analysis))
@@ -253,7 +265,9 @@ def scan_sequential(files: list[Path], cache: dict) -> list[dict]:
     return tracks
 
 
-def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
+def scan_parallel(
+    files: list[Path], cache: dict, workers: int, rb_index: dict | None = None
+) -> list[dict]:
     pending: list[str] = []
     upgrade_pending: list[tuple[str, dict]] = []
     results: dict[str, dict] = {}
@@ -262,7 +276,7 @@ def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
         path_str = str(path.resolve())
         cached = cached_analysis(path, cache)
         if cached:
-            results[path_str] = cached
+            results[path_str] = apply_rekordbox(cached, path, rb_index)
         elif upgrade := cached_analysis_for_energy_upgrade(path, cache):
             upgrade_pending.append((path_str, upgrade))
         else:
@@ -274,8 +288,10 @@ def scan_parallel(files: list[Path], cache: dict, workers: int) -> list[dict]:
     work_count = len(pending) + len(upgrade_pending)
     if work_count:
         with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(_analyze_worker, p) for p in pending]
-            futures.extend(pool.submit(_energy_upgrade_worker, p, c) for p, c in upgrade_pending)
+            futures = [pool.submit(_analyze_worker, p, rb_index) for p in pending]
+            futures.extend(
+                pool.submit(_energy_upgrade_worker, p, c, rb_index) for p, c in upgrade_pending
+            )
             for future in as_completed(futures):
                 path_str, sig, result = future.result()
                 entry = {**sig, **result}
@@ -294,15 +310,21 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
     files = discover_files(limit=limit)
     print(f"Found {len(files)} audio files")
 
+    rb_index = load_rekordbox_index()
+    if rb_index:
+        print(f"  rekordbox: {len(rb_index['by_path'])} analyzed tracks")
+    else:
+        print("  rekordbox: not used")
+
     cache = load_cache()
     if workers > 1 and len(files) > 1:
         try:
-            tracks = scan_parallel(files, cache, workers)
+            tracks = scan_parallel(files, cache, workers, rb_index)
         except BrokenProcessPool:
             print("Parallel scan worker crashed; retrying with one worker.")
-            tracks = scan_sequential(files, cache)
+            tracks = scan_sequential(files, cache, rb_index)
     else:
-        tracks = scan_sequential(files, cache)
+        tracks = scan_sequential(files, cache, rb_index)
 
     tracks.sort(key=lambda t: (t["source"], t["genre"], t["artist"].lower(), t["title"].lower()))
 

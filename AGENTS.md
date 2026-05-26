@@ -62,7 +62,11 @@ Covers scanner path rules, Camelot/mix scoring, play-queue navigation (`static/p
 
 ## Analysis vs Rekordbox
 
-BPM, energy, and Camelot key are **local analysis aids** for map placement and mix hints—not Rekordbox truth. BPM exposes `bpm_confidence`; energy exposes `energy_confidence`; key still has no separate confidence field. When `bpm_confidence` is low (UI/tooltip threshold **0.45**), verify tempo in Rekordbox before trusting grid position or mix links.
+BPM and Camelot key prefer **Rekordbox** when a local analyzed track matches the scanned file path (or same filename stem across `.wav`/`.aiff`). Set `SETA_USE_REKORDBOX=0` to disable. Override DB path with `SETA_REKORDBOX_DB`.
+
+Energy, waveform, and vocals still come from Seta's local analysis. When Rekordbox has no match, BPM/key fall back to librosa/tags as before. Track fields: `bpm_source` / `key_source` can be `rekordbox`.
+
+When `bpm_confidence` is low (UI/tooltip threshold **0.45**), verify tempo in Rekordbox before trusting grid position or mix links.
 
 ## Scanner rules
 
