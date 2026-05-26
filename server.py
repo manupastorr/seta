@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import subprocess
+import threading
 from pathlib import Path
 
-from flask import Flask, Response, abort, jsonify, send_from_directory
+from flask import Flask, Response, abort, jsonify, request, send_from_directory
 
 from config import allowed_roots, port, tracks_root
 
@@ -19,6 +21,7 @@ app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 TRACK_INDEX: dict[str, dict] = {}
 LIBRARY_CACHE: dict | None = None
 LIBRARY_MTIME: float | None = None
+_SCAN_LOCK = threading.Lock()
 
 
 def _library_mtime() -> float | None:
@@ -62,6 +65,49 @@ def api_library() -> Response:
 def api_library_reload() -> Response:
     data = load_library(force=True)
     return jsonify({"ok": True, "track_count": data.get("track_count", 0)})
+
+
+def _run_scan(*, skip_edges: bool) -> tuple[int, str]:
+    python = APP_DIR / ".venv/bin/python"
+    script = APP_DIR / "scan_library.py"
+    if not python.is_file():
+        return 127, f"Python scanner not found at {python}"
+    args = [str(python), str(script)]
+    if skip_edges:
+        args.append("--skip-edges")
+    try:
+        result = subprocess.run(
+            args,
+            cwd=str(APP_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        return 1, str(exc)
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+    return result.returncode, output
+
+
+@app.post("/api/library/scan")
+def api_library_scan() -> Response:
+    skip_edges = request.args.get("skip_edges", "1").lower() not in {"0", "false", "no"}
+    if not _SCAN_LOCK.acquire(blocking=False):
+        return jsonify({"ok": False, "error": "Scan already in progress"}), 409
+    try:
+        code, output = _run_scan(skip_edges=skip_edges)
+        if code != 0:
+            return jsonify({"ok": False, "error": output or f"scan exited {code}"}), 500
+        data = load_library(force=True)
+        return jsonify(
+            {
+                "ok": True,
+                "track_count": data.get("track_count", 0),
+                "output": output,
+            }
+        )
+    finally:
+        _SCAN_LOCK.release()
 
 
 @app.get("/api/audio/<track_id>")

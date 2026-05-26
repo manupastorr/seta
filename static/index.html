@@ -2395,6 +2395,7 @@
             <button class="chip" data-layout="explore" id="layout-explore-btn">Mix links</button>
             <span class="mix-links-note" id="mix-links-note" hidden>Mix links not built for this scan</span>
           </div>
+          <button class="secondary" id="rescan-btn" title="Rescan library (pick up new tracks in To Curate)">Rescan</button>
           <button class="secondary" id="reset-view-btn" title="Reset map zoom and pan">Reset view</button>
         </div>
       </div>
@@ -6215,6 +6216,41 @@
       renderGraph();
     }
 
+    async function reloadLibraryData() {
+      const res = await fetch("/api/library");
+      state.data = await res.json();
+      applyEnergyOverrides(state.data.tracks);
+      state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
+      populateGenres(state.data.tracks);
+      syncMixLinksAvailability();
+      syncUiLayout();
+      renderGraph();
+      updateDraftUi();
+    }
+
+    async function rescanLibrary() {
+      const btn = document.getElementById("rescan-btn");
+      if (!btn || btn.disabled) return;
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = "Scanning…";
+      try {
+        const res = await fetch("/api/library/scan?skip_edges=1", { method: "POST" });
+        const payload = await res.json();
+        if (!res.ok || !payload.ok) {
+          throw new Error(payload.error || `Scan failed (${res.status})`);
+        }
+        await reloadLibraryData();
+        btn.title = `Rescanned — ${payload.track_count} tracks`;
+      } catch (err) {
+        btn.title = String(err.message || err);
+        window.alert(`Scan failed: ${err.message || err}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    }
+
     async function init() {
       syncUiLayout();
       updateCamelotLegend();
@@ -6223,16 +6259,8 @@
       loadEnergyOverrides();
       if (!activeDraft()) ensureDraft("Set draft");
       syncInitialMixDockSidebar();
-      const res = await fetch("/api/library");
-      state.data = await res.json();
-      applyEnergyOverrides(state.data.tracks);
-      state.energyDisplayDomain = computeEnergyDisplayDomain(state.data.tracks);
-      populateGenres(state.data.tracks);
+      await reloadLibraryData();
       restoreFilterState();
-      syncMixLinksAvailability();
-      syncUiLayout();
-      renderGraph();
-      updateDraftUi();
 
       document.getElementById("search").addEventListener("input", e => {
         state.search = e.target.value;
@@ -6487,6 +6515,7 @@
 
       updateNeighborsTab(null, 0);
 
+      document.getElementById("rescan-btn").addEventListener("click", () => { rescanLibrary(); });
       document.getElementById("reset-view-btn").addEventListener("click", resetViewWithCleanup);
       document.getElementById("neighbor-mode-cue")?.addEventListener("click", () => toggleNeighborsMode());
 
