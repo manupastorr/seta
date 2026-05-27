@@ -90,7 +90,7 @@ CLI equivalents:
 
 Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.json` (not in git).
 
-**SetaMac:** use **Library → Library Folders…** instead of editing `.env` when running the native app.
+**SetaMac (native app):** download from [seta-mac releases](https://github.com/manupastorr/seta-mac/releases) — use **Library → Library Folders…** instead of editing `.env`.
 
 ## Manual commands
 
