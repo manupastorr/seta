@@ -15,7 +15,9 @@ from scan_library import (
     cached_analysis,
     cached_analysis_for_energy_upgrade,
     classify_path,
+    configure_scan,
     discover_files,
+    is_excluded_path,
     is_scannable_audio,
     parse_filename,
     track_id,
@@ -181,39 +183,91 @@ class ClassifyPathTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
+    def _configure(self) -> None:
+        configure_scan([self.tracks_root.resolve()], [self.curate_root.resolve()])
+
     def test_tracks_source_and_genre(self) -> None:
-        tracks_root = self.tracks_root.resolve()
-        curate_root = self.curate_root.resolve()
-        with patch.object(scan_library, "TRACKS_ROOT", tracks_root):
-            with patch.object(scan_library, "CURATE_ROOT", curate_root):
-                path = tracks_root / "Techno & Trance" / "A - B.wav"
-                path.parent.mkdir(parents=True)
-                path.touch()
-                meta = classify_path(path)
+        self._configure()
+        path = self.tracks_root / "Techno & Trance" / "A - B.wav"
+        path.parent.mkdir(parents=True)
+        path.touch()
+        meta = classify_path(path)
         self.assertEqual(meta["source"], "tracks")
         self.assertEqual(meta["genre"], "Techno & Trance")
         self.assertIsNone(meta["batch"])
 
     def test_curate_source_batch_and_genre(self) -> None:
-        tracks_root = self.tracks_root.resolve()
-        curate_root = self.curate_root.resolve()
-        with patch.object(scan_library, "TRACKS_ROOT", tracks_root):
-            with patch.object(scan_library, "CURATE_ROOT", curate_root):
-                path = curate_root / "Playlist Batch" / "A - B.wav"
-                path.parent.mkdir(parents=True)
-                path.touch()
-                meta = classify_path(path)
+        self._configure()
+        path = self.curate_root / "Playlist Batch" / "A - B.wav"
+        path.parent.mkdir(parents=True)
+        path.touch()
+        meta = classify_path(path)
         self.assertEqual(meta["source"], "to_curate")
         self.assertEqual(meta["genre"], "Playlist Batch")
         self.assertEqual(meta["batch"], "Playlist Batch")
 
+    def test_direct_child_uses_root_name_as_genre(self) -> None:
+        self._configure()
+        path = self.tracks_root / "Melodic House & Techno" / "A - B.wav"
+        path.parent.mkdir(parents=True)
+        path.touch()
+        meta = classify_path(path)
+        self.assertEqual(meta["genre"], "Melodic House & Techno")
+
+        genre_root = Path(self.tmp.name) / "genre-folder"
+        genre_root.mkdir()
+        direct = genre_root / "Artist - Song.wav"
+        direct.touch()
+        configure_scan([genre_root.resolve()], [])
+        meta_direct = classify_path(direct)
+        self.assertEqual(meta_direct["genre"], "genre-folder")
+
     def test_outside_roots(self) -> None:
-        tracks_root = self.tracks_root.resolve()
-        curate_root = self.curate_root.resolve()
-        with patch.object(scan_library, "TRACKS_ROOT", tracks_root):
-            with patch.object(scan_library, "CURATE_ROOT", curate_root):
-                meta = classify_path(Path(self.tmp.name) / "elsewhere.wav")
+        self._configure()
+        meta = classify_path(Path(self.tmp.name) / "elsewhere.wav")
         self.assertEqual(meta["source"], "other")
+
+
+class MultiRootTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root_a = Path(self.tmp.name) / "library-a"
+        self.root_b = Path(self.tmp.name) / "library-b"
+        self.curate_a = Path(self.tmp.name) / "incoming-a"
+        self.root_a.mkdir()
+        self.root_b.mkdir()
+        self.curate_a.mkdir()
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_multiple_tracks_roots(self) -> None:
+        file_a = self.root_a / "House" / "A - One.wav"
+        file_b = self.root_b / "Techno" / "B - Two.wav"
+        file_a.parent.mkdir(parents=True)
+        file_b.parent.mkdir(parents=True)
+        file_a.touch()
+        file_b.touch()
+        configure_scan([self.root_a.resolve(), self.root_b.resolve()], [])
+        files = discover_files()
+        self.assertEqual(files, [file_a.resolve(), file_b.resolve()])
+
+    def test_empty_curate_roots_not_replaced_by_default(self) -> None:
+        only = self.root_a / "Only.wav"
+        only.touch()
+        configure_scan([self.root_a.resolve()], [])
+        files = discover_files()
+        self.assertEqual(files, [only.resolve()])
+
+    def test_excluded_path_skipped(self) -> None:
+        kept = self.root_a / "A - Keep.wav"
+        hidden = self.root_a / "B - Hide.wav"
+        kept.touch()
+        hidden.touch()
+        configure_scan([self.root_a.resolve()], [], excluded_paths=[str(hidden.resolve())])
+        self.assertTrue(is_excluded_path(hidden))
+        files = discover_files()
+        self.assertEqual(files, [kept.resolve()])
 
 
 class DiscoverFilesTests(unittest.TestCase):
@@ -228,11 +282,8 @@ class DiscoverFilesTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _discover(self, limit: int | None = None) -> list[Path]:
-        tracks_root = self.tracks_root.resolve()
-        curate_root = self.curate_root.resolve()
-        with patch.object(scan_library, "TRACKS_ROOT", tracks_root):
-            with patch.object(scan_library, "CURATE_ROOT", curate_root):
-                return discover_files(limit=limit)
+        configure_scan([self.tracks_root.resolve()], [self.curate_root.resolve()])
+        return discover_files(limit=limit)
 
     def test_finds_audio_skips_tools_and_samples(self) -> None:
         good = self.tracks_root / "House & Deep House" / "Artist - Song.wav"

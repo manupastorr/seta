@@ -9,16 +9,15 @@ import json
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from camelot import mix_score
-from config import curate_root, tracks_root
+from config import curate_roots, tracks_roots
 from rekordbox import apply_rekordbox, load_rekordbox_index
 
 APP_DIR = Path(__file__).resolve().parent
-TRACKS_ROOT = tracks_root()
-CURATE_ROOT = curate_root()
 CACHE_PATH = APP_DIR / "cache.json"
 LIBRARY_PATH = APP_DIR / "library.json"
 AUDIO_EXTS = {".wav", ".aiff", ".aif", ".flac", ".mp3"}
@@ -29,6 +28,74 @@ SET_ID_SAMPLE_DIR = "samples"
 SET_ID_SAMPLE_PREFIX = "sample_"
 
 
+@dataclass(frozen=True)
+class ScanRoot:
+    category: str  # "tracks" | "curate"
+    path: Path
+
+    @property
+    def source(self) -> str:
+        return "tracks" if self.category == "tracks" else "to_curate"
+
+
+# Module-level scan configuration (set by configure_scan / CLI).
+TRACKS_ROOTS: list[Path] = []
+CURATE_ROOTS: list[Path] = []
+SCAN_ROOTS: list[ScanRoot] = []
+EXCLUDED_PATHS: set[str] = set()
+
+
+def configure_scan(
+    tracks_root_paths: list[Path] | None = None,
+    curate_root_paths: list[Path] | None = None,
+    excluded_paths: list[str] | None = None,
+) -> list[str]:
+    """Apply scan roots and exclusions. Returns overlap warnings."""
+    global TRACKS_ROOTS, CURATE_ROOTS, SCAN_ROOTS, EXCLUDED_PATHS
+
+    TRACKS_ROOTS = _dedupe_paths(tracks_roots() if tracks_root_paths is None else tracks_root_paths)
+    CURATE_ROOTS = _dedupe_paths(curate_roots() if curate_root_paths is None else curate_root_paths)
+    SCAN_ROOTS = [
+        *[ScanRoot("tracks", path) for path in TRACKS_ROOTS],
+        *[ScanRoot("curate", path) for path in CURATE_ROOTS],
+    ]
+    EXCLUDED_PATHS = {
+        str(Path(p).expanduser().resolve())
+        for p in (excluded_paths or [])
+    }
+    return _root_overlap_warnings()
+
+
+def _dedupe_paths(paths: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    out: list[Path] = []
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(resolved)
+    return out
+
+
+def _root_overlap_warnings() -> list[str]:
+    warnings: list[str] = []
+    roots = [(root.category, root.path) for root in SCAN_ROOTS]
+    for i, (cat_a, path_a) in enumerate(roots):
+        for cat_b, path_b in roots[i + 1 :]:
+            try:
+                if path_a == path_b:
+                    warnings.append(f"duplicate scan root: {path_a}")
+                elif path_a.is_relative_to(path_b):
+                    warnings.append(f"{path_a} is inside {path_b}; nested roots may classify oddly")
+                elif path_b.is_relative_to(path_a):
+                    warnings.append(f"{path_b} is inside {path_a}; nested roots may classify oddly")
+            except ValueError:
+                continue
+    return warnings
+
+
 def is_scannable_audio(path: Path) -> bool:
     if path.suffix.lower() not in AUDIO_EXTS:
         return False
@@ -37,18 +104,40 @@ def is_scannable_audio(path: Path) -> bool:
     return True
 
 
+def is_excluded_path(path: Path) -> bool:
+    return str(path.resolve()) in EXCLUDED_PATHS
+
+
+def owning_root(path: Path) -> ScanRoot | None:
+    path = path.resolve()
+    matches: list[tuple[int, ScanRoot]] = []
+    for root in SCAN_ROOTS:
+        try:
+            if path.is_relative_to(root.path):
+                matches.append((len(root.path.parts), root))
+        except ValueError:
+            continue
+    if not matches:
+        return None
+    matches.sort(key=lambda item: item[0], reverse=True)
+    return matches[0][1]
+
+
 def discover_files(limit: int | None = None) -> list[Path]:
     files: list[Path] = []
-    for root in (TRACKS_ROOT, CURATE_ROOT):
-        if not root.exists():
+    for root in SCAN_ROOTS:
+        if not root.path.exists():
             continue
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, _, filenames in os.walk(root.path):
             if "tools" in Path(dirpath).parts:
                 continue
             for name in filenames:
                 path = Path(dirpath) / name
-                if is_scannable_audio(path):
-                    files.append(path)
+                if not is_scannable_audio(path):
+                    continue
+                if is_excluded_path(path):
+                    continue
+                files.append(path)
     files.sort()
     if limit:
         files = files[:limit]
@@ -65,23 +154,20 @@ def parse_filename(path: Path) -> tuple[str, str]:
 
 def classify_path(path: Path) -> dict:
     path = path.resolve()
-    if path.is_relative_to(TRACKS_ROOT):
-        rel = path.relative_to(TRACKS_ROOT)
-        parts = rel.parts
-        return {
-            "source": "tracks",
-            "genre": parts[0] if len(parts) > 1 else "Unknown",
-            "batch": None,
-        }
-    if path.is_relative_to(CURATE_ROOT):
-        rel = path.relative_to(CURATE_ROOT)
-        parts = rel.parts
-        return {
-            "source": "to_curate",
-            "genre": parts[0] if len(parts) > 1 else "Uncategorized",
-            "batch": parts[0] if len(parts) > 1 else None,
-        }
-    return {"source": "other", "genre": "Other", "batch": None}
+    root = owning_root(path)
+    if root is None:
+        return {"source": "other", "genre": "Other", "batch": None}
+
+    rel = path.relative_to(root.path)
+    dir_parts = rel.parts[:-1] if len(rel.parts) > 1 else ()
+
+    if root.category == "tracks":
+        genre = dir_parts[0] if dir_parts else root.path.name
+        return {"source": "tracks", "genre": genre, "batch": None}
+
+    batch = dir_parts[0] if dir_parts else None
+    genre = dir_parts[0] if dir_parts else root.path.name
+    return {"source": "to_curate", "genre": genre, "batch": batch}
 
 
 def track_id(path: Path) -> str:
@@ -306,9 +392,46 @@ def scan_parallel(
     return [track_record(path, results[str(path.resolve())]) for path in files]
 
 
-def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -> dict:
+def library_metadata() -> dict:
+    tracks_list = [str(p) for p in TRACKS_ROOTS]
+    curate_list = [str(p) for p in CURATE_ROOTS]
+    return {
+        "tracks_root": tracks_list[0] if tracks_list else "",
+        "curate_root": curate_list[0] if curate_list else "",
+        "tracks_roots": tracks_list,
+        "curate_roots": curate_list,
+    }
+
+
+def scan(
+    limit: int | None = None,
+    workers: int = 4,
+    skip_edges: bool = False,
+    tracks_root_paths: list[Path] | None = None,
+    curate_root_paths: list[Path] | None = None,
+    excluded_paths: list[str] | None = None,
+) -> dict:
+    warnings = configure_scan(tracks_root_paths, curate_root_paths, excluded_paths)
+    for warning in warnings:
+        print(f"  warning: {warning}")
+
+    if not SCAN_ROOTS:
+        print("No scan roots configured.")
+        library = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            **library_metadata(),
+            "track_count": 0,
+            "tracks": [],
+            "edges": [],
+        }
+        LIBRARY_PATH.write_text(json.dumps(library, indent=2))
+        print(f"Wrote {LIBRARY_PATH} (0 tracks)")
+        return library
+
     files = discover_files(limit=limit)
     print(f"Found {len(files)} audio files")
+    if EXCLUDED_PATHS:
+        print(f"  excluded paths: {len(EXCLUDED_PATHS)}")
 
     rb_index = load_rekordbox_index()
     if rb_index:
@@ -330,8 +453,7 @@ def scan(limit: int | None = None, workers: int = 4, skip_edges: bool = False) -
 
     library = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "tracks_root": str(TRACKS_ROOT),
-        "curate_root": str(CURATE_ROOT),
+        **library_metadata(),
         "track_count": len(tracks),
         "tracks": tracks,
         "edges": [] if skip_edges else build_edges(tracks),
@@ -346,9 +468,44 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="Only scan first N files")
     parser.add_argument("--workers", type=int, default=max(2, os.cpu_count() or 4) - 1)
     parser.add_argument("--skip-edges", action="store_true")
+    parser.add_argument(
+        "--tracks-root",
+        action="append",
+        default=[],
+        dest="tracks_roots",
+        metavar="PATH",
+        help="Curated library folder (repeatable)",
+    )
+    parser.add_argument(
+        "--curate-root",
+        action="append",
+        default=[],
+        dest="curate_roots",
+        metavar="PATH",
+        help="Uncurated / intake folder (repeatable)",
+    )
+    parser.add_argument(
+        "--exclude-path",
+        action="append",
+        default=[],
+        dest="exclude_paths",
+        metavar="PATH",
+        help="Skip this absolute audio path (repeatable)",
+    )
     args = parser.parse_args()
-    scan(limit=args.limit, workers=args.workers, skip_edges=args.skip_edges)
+
+    tracks_paths = [Path(p) for p in args.tracks_roots] if args.tracks_roots else None
+    curate_paths = [Path(p) for p in args.curate_roots] if args.curate_roots else None
+
+    scan(
+        limit=args.limit,
+        workers=args.workers,
+        skip_edges=args.skip_edges,
+        tracks_root_paths=tracks_paths,
+        curate_root_paths=curate_paths,
+        excluded_paths=args.exclude_paths or None,
+    )
 
 
-if __name__ == "__main__":
-    main()
+# Default configuration on import for tests and legacy callers.
+configure_scan()

@@ -74,7 +74,23 @@ SETA_CURATE_ROOT=~/Downloads/To Curate
 SETA_PORT=8765
 ```
 
+Multiple roots (colon-separated on macOS):
+
+```bash
+SETA_TRACKS_ROOTS=~/Music/tracks:~/Other/Approved
+SETA_CURATE_ROOTS=~/Downloads/To Curate:~/Incoming
+```
+
+CLI equivalents:
+
+```bash
+.venv/bin/python scan_library.py --tracks-root ~/Music/tracks --curate-root ~/Downloads/To\ Curate
+.venv/bin/python scan_library.py --tracks-root ~/Music/tracks/House --tracks-root ~/Music/tracks/Techno
+```
+
 Then `./start.sh` again. Each machine keeps its own `library.json` and `cache.json` (not in git).
+
+**SetaMac:** use **Library → Library Folders…** instead of editing `.env` when running the native app.
 
 ## Manual commands
 

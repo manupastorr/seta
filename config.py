@@ -27,11 +27,45 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 
+def _resolve_path(raw: str) -> Path:
+    return Path(raw).expanduser().resolve()
+
+
 def _path_from_env(name: str, default: Path) -> Path:
     raw = os.environ.get(name)
     if not raw:
         return default.expanduser().resolve()
-    return Path(raw).expanduser().resolve()
+    return _resolve_path(raw)
+
+
+def _split_path_list(raw: str) -> list[str]:
+    """Split env list on os.pathsep or newline."""
+    parts: list[str] = []
+    for chunk in raw.replace("\n", os.pathsep).split(os.pathsep):
+        item = chunk.strip()
+        if item:
+            parts.append(item)
+    return parts
+
+
+def _paths_from_env_list(list_name: str, single_name: str, default: Path) -> list[Path]:
+    plural = os.environ.get(list_name)
+    if plural:
+        paths = [_resolve_path(item) for item in _split_path_list(plural)]
+        return _dedupe_paths(paths)
+    return [_path_from_env(single_name, default)]
+
+
+def _dedupe_paths(paths: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    out: list[Path] = []
+    for path in paths:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return out
 
 
 def tracks_root() -> Path:
@@ -42,8 +76,16 @@ def curate_root() -> Path:
     return _path_from_env("SETA_CURATE_ROOT", DEFAULT_CURATE_ROOT)
 
 
+def tracks_roots() -> list[Path]:
+    return _paths_from_env_list("SETA_TRACKS_ROOTS", "SETA_TRACKS_ROOT", DEFAULT_TRACKS_ROOT)
+
+
+def curate_roots() -> list[Path]:
+    return _paths_from_env_list("SETA_CURATE_ROOTS", "SETA_CURATE_ROOT", DEFAULT_CURATE_ROOT)
+
+
 def allowed_roots() -> tuple[Path, ...]:
-    return tracks_root(), curate_root()
+    return tuple(tracks_roots() + curate_roots())
 
 
 def port() -> int:
