@@ -469,6 +469,11 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=max(2, os.cpu_count() or 4) - 1)
     parser.add_argument("--skip-edges", action="store_true")
     parser.add_argument(
+        "--explicit-roots",
+        action="store_true",
+        help="Use only --tracks-root / --curate-root args; do not fall back to config.py defaults",
+    )
+    parser.add_argument(
         "--tracks-root",
         action="append",
         default=[],
@@ -494,8 +499,12 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    tracks_paths = [Path(p) for p in args.tracks_roots] if args.tracks_roots else None
-    curate_paths = [Path(p) for p in args.curate_roots] if args.curate_roots else None
+    if args.explicit_roots:
+        tracks_paths = [Path(p) for p in args.tracks_roots]
+        curate_paths = [Path(p) for p in args.curate_roots]
+    else:
+        tracks_paths = [Path(p) for p in args.tracks_roots] if args.tracks_roots else None
+        curate_paths = [Path(p) for p in args.curate_roots] if args.curate_roots else None
 
     scan(
         limit=args.limit,
@@ -509,3 +518,6 @@ def main() -> None:
 
 # Default configuration on import for tests and legacy callers.
 configure_scan()
+
+if __name__ == "__main__":
+    main()

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -445,6 +447,38 @@ class LibrarySanityTests(unittest.TestCase):
             "vocals_confidence": 0.42,
             "analysis_error": None,
         }
+
+
+class ScanLibraryCliTests(unittest.TestCase):
+    def test_cli_main_writes_library_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tracks_root = root / "tracks"
+            tracks_root.mkdir()
+            (tracks_root / "Artist - Song.wav").touch()
+            script = scan_library.APP_DIR / "scan_library.py"
+            library_path = scan_library.APP_DIR / "library.json"
+            library_path.unlink(missing_ok=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--explicit-roots",
+                    "--skip-edges",
+                    "--tracks-root",
+                    str(tracks_root),
+                    "--limit",
+                    "1",
+                ],
+                cwd=scan_library.APP_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            self.assertTrue(library_path.exists(), "scan_library.py CLI must write library.json")
+            library = json.loads(library_path.read_text())
+            self.assertEqual(library["track_count"], 1)
 
 
 if __name__ == "__main__":
